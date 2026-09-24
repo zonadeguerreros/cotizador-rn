@@ -382,8 +382,19 @@
       if (action === 'ver-avance-adj') {
         const av = data.draft.avances[Number(button.dataset.av)];
         const att = av && av.attachments[Number(button.dataset.att)];
-        if (att && att.storagePath) openStorageViewer(att.name, att.storagePath);
-        else if (att && att.data) {
+        const isPdf = att && att.type === 'pdf';
+        if (att && att.storagePath) openStorageViewer(att.name, att.storagePath, isPdf);
+        else if (att && att.data && isPdf) {
+          /* Adjunto todavia no subido a la nube (sin storagePath): el iframe
+             no renderiza PDF, y los navegadores bloquean window.open con una
+             data: URL directa, asi que se convierte a blob: URL primero. */
+          const parts = att.data.split(',');
+          const bin = atob(parts[1] || '');
+          const bytes = new Uint8Array(bin.length);
+          for (let k = 0; k < bin.length; k++) bytes[k] = bin.charCodeAt(k);
+          const blobUrl = URL.createObjectURL(new Blob([bytes], {type: 'application/pdf'}));
+          window.open(blobUrl, '_blank');
+        } else if (att && att.data) {
           const ov = ensureDocViewer();
           document.getElementById('doc-viewer-title').textContent = att.name;
           document.getElementById('doc-viewer-frame').src = att.data;

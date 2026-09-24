@@ -160,7 +160,22 @@ document.getElementById('viewer-close').onclick=function(){
 document.getElementById('viewer-overlay').addEventListener('click',function(e){
   if(e.target.id==='viewer-overlay'){document.getElementById('viewer-close').click();}
 });
-function openViewer(name,storagePath){
+function openViewer(name,storagePath,isPdf){
+  /* Chrome no renderiza el visor de PDF dentro de un iframe (queda en
+     blanco aunque el archivo este perfecto); para PDF se abre directo en
+     una pestana nueva. La pestana se abre de forma sincrona al clic (antes
+     de esperar la URL) para que el bloqueador de popups no la interrumpa. */
+  if(isPdf===undefined)isPdf=/\.pdf$/i.test(name||'');
+  if(isPdf){
+    var win=window.open('','_blank');
+    firebase.storage().ref(storagePath).getDownloadURL().then(function(url){
+      if(win)win.location=url;
+    }).catch(function(e){
+      if(win)win.close();
+      alert('No se pudo abrir el archivo: '+(e&&e.message?e.message:e));
+    });
+    return;
+  }
   var ov=ensureViewer();
   document.getElementById('viewer-title').textContent=name||'Archivo';
   document.getElementById('viewer-frame').src='about:blank';
@@ -246,7 +261,7 @@ function renderDash(mirror){
   var avancesList=(mirror.avances||[]).slice().reverse();
   var avancesHtml=avancesList.length ? avancesList.map(function(av){
     var atts=(av.attachments||[]).map(function(a){
-      return '<span class="att" data-name="'+escHtml(a.name)+'" data-path="'+escHtml(a.storagePath||'')+'">'+(a.type==='pdf'?'📄':'🖼')+' '+escHtml(a.name)+'</span>';
+      return '<span class="att" data-name="'+escHtml(a.name)+'" data-path="'+escHtml(a.storagePath||'')+'" data-type="'+escHtml(a.type||'')+'">'+(a.type==='pdf'?'📄':'🖼')+' '+escHtml(a.name)+'</span>';
     }).join('');
     return '<div class="avance"><div class="date">'+escHtml(av.date)+'</div><p>'+escHtml(av.note)+'</p>'+atts+'</div>';
   }).join('') : '<p style="color:#64748b">Todavía no hay avances registrados.</p>';
@@ -276,10 +291,10 @@ function renderDash(mirror){
   document.querySelectorAll('.photo-grid img').forEach(function(img){
     var path=img.dataset.path;
     if(path) firebase.storage().ref(path).getDownloadURL().then(function(url){img.src=url;}).catch(function(){});
-    img.onclick=function(){ if(path) openViewer(img.dataset.name,path); };
+    img.onclick=function(){ if(path) openViewer(img.dataset.name,path,false); };
   });
   document.querySelectorAll('.att').forEach(function(el){
-    el.onclick=function(){ if(el.dataset.path) openViewer(el.dataset.name,el.dataset.path); };
+    el.onclick=function(){ if(el.dataset.path) openViewer(el.dataset.name,el.dataset.path,el.dataset.type==='pdf'); };
   });
   showView('view-dash');
 }
