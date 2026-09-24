@@ -121,7 +121,7 @@ th{color:#64748b;font-weight:700;font-size:11px;text-transform:uppercase}
 <script src="https://cdn.jsdelivr.net/npm/firebase@10.14.1/firebase-app-compat.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/firebase@10.14.1/firebase-auth-compat.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/firebase@10.14.1/firebase-firestore-compat.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/firebase@10.14.1/firebase-storage-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/firebase-10.14.1/firebase-storage-compat.js"></script>
 <script>
 firebase.initializeApp({
   apiKey:"AIzaSyAaFoYefcJLaBMlD4Ft9qhLslbuHGm7xVs",
@@ -196,8 +196,10 @@ document.getElementById('form-signup').addEventListener('submit',async function(
     });
     showView('view-pending');
   }catch(e){
-    if(e&&e.code==='auth/email-already-in-use')msg.textContent='Ese usuario ya está en uso, elige otro.';
-    else if(e&&e.code==='auth/weak-password')msg.textContent='La clave es muy débil.';
+    var code=e&&e.code;
+    if(code==='auth/email-already-in-use')msg.textContent='Ese usuario ya está en uso, elige otro.';
+    else if(code==='auth/weak-password')msg.textContent='La clave es muy débil.';
+    else if(code==='auth/network-request-failed')msg.textContent='Sin conexión a internet. Revisa tu conexión (datos móviles o Wi-Fi) e intenta de nuevo.';
     else msg.textContent='No se pudo crear la cuenta: '+((e&&e.message)||e);
   }
   go.disabled=false;
@@ -216,7 +218,12 @@ document.getElementById('form-login').addEventListener('submit',async function(e
     await authReady;
     await auth.signInWithEmailAndPassword(toEmail(username),pass);
   }catch(e){
-    msg.textContent='Usuario o clave incorrectos.';
+    var code=e&&e.code;
+    if(code==='auth/network-request-failed')msg.textContent='Sin conexión a internet. Revisa tu conexión (datos móviles o Wi-Fi) e intenta de nuevo.';
+    else if(code==='auth/too-many-requests')msg.textContent='Demasiados intentos. Espera unos minutos e intenta de nuevo.';
+    else if(code==='auth/user-disabled')msg.textContent='Esta cuenta fue deshabilitada.';
+    else if(code==='auth/wrong-password'||code==='auth/user-not-found'||code==='auth/invalid-credential'||code==='auth/invalid-email')msg.textContent='Usuario o clave incorrectos.';
+    else msg.textContent='No se pudo iniciar sesión: '+((e&&e.message)||e);
   }
   go.disabled=false;
 });
