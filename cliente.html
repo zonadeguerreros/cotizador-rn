@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Portal Cliente R&amp;N</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{min-height:100vh;background:#f4f6f9;font-family:'Segoe UI',system-ui,sans-serif;color:#1e2733}
+header{background:linear-gradient(155deg,#163f78 0%,#07111c 100%);color:#fff;padding:18px 20px;border-bottom:4px solid #e21b1b;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+header h1{font-size:18px}
+header p{font-size:12px;color:#b9c6de;margin-top:2px}
+main{max-width:820px;margin:0 auto;padding:20px 16px 60px}
+.card{background:#fff;border-radius:12px;padding:20px;box-shadow:0 2px 10px rgba(0,0,0,.06);margin-bottom:16px}
+.ct{font-size:13px;font-weight:800;color:#163f78;text-transform:uppercase;letter-spacing:.03em;margin-bottom:14px}
+label.L{display:block;font-size:12px;font-weight:700;color:#475569;margin-bottom:6px}
+input[type=text],input[type=password]{width:100%;padding:11px;border:1px solid rgba(0,0,0,.16);border-radius:8px;font-size:15px;outline:none;margin-bottom:14px}
+input:focus{border-color:#2b6fe0}
+textarea{width:100%;padding:10px;border:1px solid rgba(0,0,0,.16);border-radius:8px;font-size:14px;outline:none;resize:vertical}
+button{border:0;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;padding:12px 16px}
+button:disabled{opacity:.6;cursor:wait}
+.btn-p{background:#e21b1b;color:#fff;width:100%}
+.btn-s{background:transparent;color:#163f78;text-decoration:underline;width:100%;font-weight:600;padding:10px}
+.btn-sm{padding:8px 12px;font-size:13px}
+.btn-outline{background:#fff;border:1px solid #163f78;color:#163f78}
+#msg{min-height:18px;margin-top:6px;font-size:13px;color:#b91c1c}
+.hidden{display:none!important}
+.row{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid rgba(0,0,0,.06);font-size:14px}
+.row:last-child{border-bottom:0}
+.row span:first-child{color:#64748b}
+.pill{display:inline-block;background:#fef3c7;color:#92400e;font-size:12px;font-weight:700;padding:4px 10px;border-radius:999px}
+table{width:100%;border-collapse:collapse;font-size:13px;margin-top:10px}
+th,td{padding:7px 8px;text-align:left;border-bottom:1px solid rgba(0,0,0,.07)}
+th{color:#64748b;font-weight:700;font-size:11px;text-transform:uppercase}
+.photo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px;margin-top:10px}
+.photo-grid img{width:100%;height:100px;object-fit:cover;border-radius:8px;cursor:pointer;border:1px solid rgba(0,0,0,.08)}
+.avance{border-left:3px solid #2b6fe0;padding:10px 0 10px 14px;margin-bottom:12px}
+.avance .date{font-weight:800;color:#163f78;font-size:13px}
+.avance p{margin:6px 0;white-space:pre-wrap;font-size:14px}
+.att{display:inline-block;background:#eef2f7;border-radius:7px;padding:5px 10px;font-size:12px;margin:4px 6px 0 0;cursor:pointer}
+#logout{background:transparent;border:1px solid rgba(255,255,255,.35);color:#fff;font-size:12px;padding:7px 12px}
+#viewer-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:9999;padding:18px;box-sizing:border-box}
+#viewer-box{background:#fff;border-radius:10px;max-width:1000px;height:100%;margin:0 auto;display:flex;flex-direction:column;overflow:hidden}
+#viewer-head{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:1px solid rgba(0,0,0,.08);gap:8px;flex-wrap:wrap}
+#viewer-frame{flex:1;border:0;width:100%}
+</style>
+</head>
+<body>
+<header>
+  <div><h1>Portal Cliente &middot; R &amp; N Electricidad y Electr&oacute;nica</h1><p>Seguimiento de tu proyecto</p></div>
+  <button id="logout" class="hidden">Cerrar sesi&oacute;n</button>
+</header>
+<main>
+
+<div id="view-login" class="card">
+  <div class="ct">Iniciar sesi&oacute;n</div>
+  <form id="form-login" autocomplete="on">
+    <label class="L" for="li-user">Usuario</label>
+    <input type="text" id="li-user" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false">
+    <label class="L" for="li-pass">Clave</label>
+    <input type="password" id="li-pass" autocomplete="current-password">
+    <button type="submit" class="btn-p" id="li-go">Entrar</button>
+    <div id="msg"></div>
+  </form>
+  <button type="button" class="btn-s" id="show-signup">¿No tienes cuenta? Crear cuenta de cliente</button>
+</div>
+
+<div id="view-signup" class="card hidden">
+  <div class="ct">Crear cuenta de cliente</div>
+  <p style="color:#64748b;font-size:13px;margin-bottom:14px">Pide a R &amp; N el n&uacute;mero de tu proyecto (algo como <strong>RN-P-20260924-12345</strong>). Tu cuenta queda pendiente de aprobaci&oacute;n hasta que R &amp; N la confirme.</p>
+  <form id="form-signup" autocomplete="on">
+    <label class="L" for="su-name">Tu nombre</label>
+    <input type="text" id="su-name" autocomplete="name">
+    <label class="L" for="su-proj">N&uacute;mero de proyecto</label>
+    <input type="text" id="su-proj" autocapitalize="off" autocorrect="off" spellcheck="false">
+    <label class="L" for="su-user">Elige un usuario</label>
+    <input type="text" id="su-user" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false">
+    <label class="L" for="su-pass">Elige una clave</label>
+    <input type="password" id="su-pass" autocomplete="new-password">
+    <button type="submit" class="btn-p" id="su-go">Solicitar cuenta</button>
+    <div id="msg2"></div>
+  </form>
+  <button type="button" class="btn-s" id="show-login">Ya tengo cuenta, iniciar sesi&oacute;n</button>
+</div>
+
+<div id="view-pending" class="card hidden">
+  <div class="ct">Solicitud pendiente</div>
+  <p><span class="pill">Pendiente de aprobaci&oacute;n</span></p>
+  <p style="margin-top:12px;color:#475569">Tu cuenta fue creada, pero R &amp; N todav&iacute;a no la aprueba. Vuelve a intentar entrar m&aacute;s tarde.</p>
+</div>
+
+<div id="view-rejected" class="card hidden">
+  <div class="ct">Solicitud no aprobada</div>
+  <p style="color:#475569">Tu solicitud de acceso no fue aprobada. Contacta directamente a R &amp; N si crees que es un error.</p>
+</div>
+
+<div id="view-dash" class="hidden"></div>
+
+</main>
+
+<div id="viewer-overlay">
+  <div id="viewer-box">
+    <div id="viewer-head">
+      <strong id="viewer-title"></strong>
+      <div style="display:flex;gap:8px">
+        <a id="viewer-open" href="#" target="_blank" rel="noopener" class="btn-sm btn-outline" style="text-decoration:none;display:inline-block">Abrir en pesta&ntilde;a nueva</a>
+        <button id="viewer-close" class="btn-sm btn-outline">&#10005; Cerrar</button>
+      </div>
+    </div>
+    <iframe id="viewer-frame" title="Documento"></iframe>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/firebase@10.14.1/firebase-app-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/firebase@10.14.1/firebase-auth-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/firebase@10.14.1/firebase-firestore-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/firebase@10.14.1/firebase-storage-compat.js"></script>
+<script>
+firebase.initializeApp({
+  apiKey:"AIzaSyAaFoYefcJLaBMlD4Ft9qhLslbuHGm7xVs",
+  authDomain:"cotizador-r-y-n.firebaseapp.com",
+  projectId:"cotizador-r-y-n",
+  storageBucket:"cotizador-r-y-n.firebasestorage.app",
+  messagingSenderId:"732030961262",
+  appId:"1:732030961262:web:1d56b786de81844263c87f"
+});
+var auth=firebase.auth(), db=firebase.firestore();
+/* Sesion aislada por pestana: este sitio tambien sirve index.html (el
+   dueno), y Firebase comparte la sesion entre pestanas del mismo sitio
+   por defecto (localStorage). Con SESSION queda por pestana, para que
+   iniciar sesion aqui como cliente no le cambie la sesion al dueno en
+   otra pestana. */
+var authReady=auth.setPersistence(firebase.auth.Auth.Persistence.SESSION).catch(function(){});
+var EMAIL_DOMAIN='@cliente.cotizador-rn.local';
+function escHtml(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
+function toEmail(username){return String(username||'').trim().toLowerCase().replace(/[^a-z0-9._-]/g,'')+EMAIL_DOMAIN;}
+function showView(id){
+  ['view-login','view-signup','view-pending','view-rejected','view-dash'].forEach(function(v){
+    document.getElementById(v).classList.toggle('hidden', v!==id);
+  });
+  document.getElementById('logout').classList.toggle('hidden', id==='view-login'||id==='view-signup');
+}
+document.getElementById('show-signup').onclick=function(){showView('view-signup');};
+document.getElementById('show-login').onclick=function(){showView('view-login');};
+document.getElementById('logout').onclick=function(){auth.signOut();showView('view-login');};
+
+/* === Visor de archivos (fotos y PDF de avances) === */
+function ensureViewer(){return document.getElementById('viewer-overlay');}
+document.getElementById('viewer-close').onclick=function(){
+  document.getElementById('viewer-overlay').style.display='none';
+  document.getElementById('viewer-frame').src='about:blank';
+};
+document.getElementById('viewer-overlay').addEventListener('click',function(e){
+  if(e.target.id==='viewer-overlay'){document.getElementById('viewer-close').click();}
+});
+function openViewer(name,storagePath){
+  var ov=ensureViewer();
+  document.getElementById('viewer-title').textContent=name||'Archivo';
+  document.getElementById('viewer-frame').src='about:blank';
+  document.getElementById('viewer-open').href='#';
+  ov.style.display='block';
+  firebase.storage().ref(storagePath).getDownloadURL().then(function(url){
+    document.getElementById('viewer-frame').src=url;
+    document.getElementById('viewer-open').href=url;
+  }).catch(function(e){
+    document.getElementById('viewer-close').click();
+    alert('No se pudo abrir el archivo: '+(e&&e.message?e.message:e));
+  });
+}
+
+/* === Registro === */
+document.getElementById('form-signup').addEventListener('submit',async function(ev){
+  ev.preventDefault();
+  var msg=document.getElementById('msg2'), go=document.getElementById('su-go');
+  msg.textContent='';
+  var name=document.getElementById('su-name').value.trim();
+  var projectNumber=document.getElementById('su-proj').value.trim();
+  var username=document.getElementById('su-user').value.trim();
+  var pass=document.getElementById('su-pass').value;
+  if(!name||!projectNumber||!username||!pass){msg.textContent='Completa todos los campos.';return;}
+  if(pass.length<6){msg.textContent='La clave debe tener al menos 6 caracteres.';return;}
+  go.disabled=true;
+  try{
+    await authReady;
+    var cred=await auth.createUserWithEmailAndPassword(toEmail(username),pass);
+    await db.collection('clientAccounts').doc(cred.user.uid).set({
+      email:toEmail(username), displayName:name, projectNumber:projectNumber,
+      status:'pending', requestedAt:Date.now()
+    });
+    showView('view-pending');
+  }catch(e){
+    if(e&&e.code==='auth/email-already-in-use')msg.textContent='Ese usuario ya está en uso, elige otro.';
+    else if(e&&e.code==='auth/weak-password')msg.textContent='La clave es muy débil.';
+    else msg.textContent='No se pudo crear la cuenta: '+((e&&e.message)||e);
+  }
+  go.disabled=false;
+});
+
+/* === Login === */
+document.getElementById('form-login').addEventListener('submit',async function(ev){
+  ev.preventDefault();
+  var msg=document.getElementById('msg'), go=document.getElementById('li-go');
+  msg.textContent='';
+  var username=document.getElementById('li-user').value.trim();
+  var pass=document.getElementById('li-pass').value;
+  if(!username||!pass){msg.textContent='Escribe tu usuario y clave.';return;}
+  go.disabled=true;
+  try{
+    await authReady;
+    await auth.signInWithEmailAndPassword(toEmail(username),pass);
+  }catch(e){
+    msg.textContent='Usuario o clave incorrectos.';
+  }
+  go.disabled=false;
+});
+
+/* === Panel del cliente === */
+function fmCLP(n){return new Intl.NumberFormat('es-CL',{style:'currency',currency:'CLP',maximumFractionDigits:0}).format(n||0);}
+function renderDash(mirror){
+  var net=(mirror.items||[]).reduce(function(a,it){return a+(it.price||0);},0);
+  var iva=Math.round(net*0.19), total=net+iva;
+  var rowsHtml=(mirror.items||[]).map(function(it,i){
+    return '<tr><td>'+(i+1)+'</td><td>'+escHtml(it.name)+'</td><td>'+escHtml(it.scope)+'</td><td>'+fmCLP(it.price)+'</td></tr>';
+  }).join('');
+  function section(title,text){
+    if(!text||!text.trim())return'';
+    return '<div class="ct" style="margin-top:16px">'+escHtml(title)+'</div><p style="white-space:pre-wrap;font-size:14px;color:#334155">'+escHtml(text)+'</p>';
+  }
+  var photosHtml=(mirror.photos||[]).length ? '<div class="photo-grid">'+mirror.photos.map(function(ph,i){
+    return '<img data-name="'+escHtml(ph.name||('Foto '+(i+1)))+'" data-path="'+escHtml(ph.storagePath||'')+'" alt="'+escHtml(ph.name||'')+'">';
+  }).join('')+'</div>' : '';
+  var avancesList=(mirror.avances||[]).slice().reverse();
+  var avancesHtml=avancesList.length ? avancesList.map(function(av){
+    var atts=(av.attachments||[]).map(function(a){
+      return '<span class="att" data-name="'+escHtml(a.name)+'" data-path="'+escHtml(a.storagePath||'')+'">'+(a.type==='pdf'?'📄':'🖼')+' '+escHtml(a.name)+'</span>';
+    }).join('');
+    return '<div class="avance"><div class="date">'+escHtml(av.date)+'</div><p>'+escHtml(av.note)+'</p>'+atts+'</div>';
+  }).join('') : '<p style="color:#64748b">Todavía no hay avances registrados.</p>';
+
+  document.getElementById('view-dash').innerHTML =
+    '<div class="card"><div class="ct">'+escHtml(mirror.title||'Proyecto')+'</div>'
+    +'<div class="row"><span>Titular</span><span>'+escHtml(mirror.client)+'</span></div>'
+    +'<div class="row"><span>Ubicación</span><span>'+escHtml(mirror.location||'—')+'</span></div>'
+    +'<div class="row"><span>Fecha del informe</span><span>'+escHtml(mirror.date||'—')+'</span></div>'
+    +'<div class="row"><span>N° de informe</span><span>'+escHtml(mirror.number||'—')+'</span></div>'
+    +section('Introducción',mirror.intro)
+    +section('Observaciones y diagnóstico',mirror.diagnosis)
+    +section('Correcciones y verificaciones recomendadas',mirror.corrections)
+    +section('Referencias técnicas',mirror.references)
+    +(photosHtml?'<div class="ct" style="margin-top:16px">Registro fotográfico</div>'+photosHtml:'')
+    +'</div>'
+    +'<div class="card"><div class="ct">Presupuesto de trabajos</div>'
+    +(mirror.scope?'<p style="font-size:13px;color:#475569;margin-bottom:10px">'+escHtml(mirror.scope)+'</p>':'')
+    +'<table><thead><tr><th>Ítem</th><th>Trabajo</th><th>Alcance</th><th>Valor neto</th></tr></thead><tbody>'+rowsHtml+'</tbody></table>'
+    +'<div style="max-width:340px;margin:14px 0 0 auto">'
+    +'<div class="row"><span>Neto</span><span>'+fmCLP(net)+'</span></div>'
+    +'<div class="row"><span>IVA 19%</span><span>'+fmCLP(iva)+'</span></div>'
+    +'<div class="row"><strong>Total</strong><strong>'+fmCLP(total)+'</strong></div></div>'
+    +'</div>'
+    +'<div class="card"><div class="ct">Avances del proyecto</div>'+avancesHtml+'</div>';
+
+  document.querySelectorAll('.photo-grid img').forEach(function(img){
+    var path=img.dataset.path;
+    if(path) firebase.storage().ref(path).getDownloadURL().then(function(url){img.src=url;}).catch(function(){});
+    img.onclick=function(){ if(path) openViewer(img.dataset.name,path); };
+  });
+  document.querySelectorAll('.att').forEach(function(el){
+    el.onclick=function(){ if(el.dataset.path) openViewer(el.dataset.name,el.dataset.path); };
+  });
+  showView('view-dash');
+}
+
+auth.onAuthStateChanged(async function(user){
+  if(!user){ showView('view-login'); return; }
+  try{
+    var accDoc=await db.collection('clientAccounts').doc(user.uid).get();
+    if(!accDoc.exists){ await auth.signOut(); return; }
+    var acc=accDoc.data();
+    if(acc.status==='pending'){ showView('view-pending'); return; }
+    if(acc.status!=='approved'){ showView('view-rejected'); return; }
+    var mirrorDoc=await db.collection('clientView').doc(acc.projectId).get();
+    if(!mirrorDoc.exists || !mirrorDoc.data().clientApproved){ showView('view-pending'); return; }
+    renderDash(mirrorDoc.data());
+  }catch(e){
+    if(e&&e.code==='permission-denied'){
+      /* El acceso a este proyecto fue revocado, o todavia no esta aprobado. */
+      showView('view-pending');
+    }else{
+      document.getElementById('view-dash').innerHTML='<div class="card"><p style="color:#b91c1c">No se pudo cargar tu proyecto: '+escHtml((e&&e.message)||String(e))+'</p></div>';
+      showView('view-dash');
+    }
+  }
+});
+</script>
+</body>
+</html>
