@@ -5,6 +5,12 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex,nofollow">
 <title>Portal Cliente R&amp;N</title>
+<link rel="manifest" href="manifest-cliente.json">
+<meta name="theme-color" content="#163f78">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Portal R&amp;N">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{min-height:100vh;background:#f4f6f9;font-family:'Segoe UI',system-ui,sans-serif;color:#1e2733}
@@ -292,6 +298,12 @@ auth.onAuthStateChanged(async function(user){
     }
   }
 });
+
+if('serviceWorker' in navigator){
+  window.addEventListener('load',function(){
+    navigator.serviceWorker.register('sw.js').catch(function(){});
+  });
+}
 </script>
 </body>
 </html>
