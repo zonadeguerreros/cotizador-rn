@@ -240,9 +240,9 @@
        lista no quede tediosa de leer cuando hay muchos registrados. */
     el.innerHTML = list.length ? list.slice().reverse().map(av => {
       const j = list.indexOf(av);
-      const atts = (av.attachments || []).map((a, k) => `<span class="btn bh xs" data-action="ver-avance-adj" data-av="${j}" data-att="${k}" style="cursor:pointer;margin:4px 6px 0 0;display:inline-block">${a.type === 'pdf' ? '📄' : '🖼'} ${escape(a.name)}</span>`).join('');
+      const atts = (av.attachments || []).map((a, k) => { if (a.type === 'pdf') return `<span class="btn bh xs" data-action="ver-avance-adj" data-av="${j}" data-att="${k}" style="cursor:pointer;margin:4px 6px 0 0;display:inline-block">📄 ${escape(a.name)}</span>`; return `<img class="att-thumb" data-action="ver-avance-adj" data-av="${j}" data-att="${k}" data-path="${escape(a.storagePath || '')}" ${a.data ? `src="${a.data}"` : ''} alt="${escape(a.name)}" title="${escape(a.name)}">`; }).join('');
       return `<details class="acc avance-item"><summary><span>${escape(av.date)}</span></summary><div class="acc-body"><p class="avance-body-note">${escape(av.note)}</p>${atts ? `<div>${atts}</div>` : ''}<button class="btn bh xs" data-action="remove-avance" data-av="${j}" style="margin-top:10px">Quitar</button></div></details>`;
-    }).join('') : '<p style="color:var(--mut)">Aún no hay avances registrados para este proyecto.</p>';
+    }).join('') : '<p style="color:var(--mut)">Aún no hay avances registrados para este proyecto.</p>'; el.querySelectorAll('.att-thumb').forEach(img => { if (!img.getAttribute('src') && img.dataset.path && window.firebase && firebase.storage) { firebase.storage().ref(img.dataset.path).getDownloadURL().then(url => { img.src = url; }).catch(() => {}); } });
   }
   function renderHistory() {
     const el = document.getElementById('pr-history');
@@ -363,8 +363,8 @@
     if (busy) { status('Espera a que terminen de procesar los archivos antes de continuar…', true); return; }
     const action = button.dataset.action, i = Number(button.dataset.index);
     try {
-      if (action === 'add-row') { data.draft.items.push({name: '', scope: '', price: 0}); renderRows(); changed(); }
-      if (action === 'remove-row' && confirm('¿Quitar este trabajo del borrador?')) { data.draft.items.splice(i, 1); renderRows(); changed(); }
+      if (action === 'add-row') { data.draft.items.push({name: '', scope: '', price: 0}); renderRows(); changed(); await syncDraftToSavedProject(); }
+      if (action === 'remove-row' && confirm('¿Quitar este trabajo del borrador?')) { data.draft.items.splice(i, 1); renderRows(); changed(); await syncDraftToSavedProject(); }
       if (action === 'remove-photo' && confirm('¿Quitar esta fotografía del borrador?')) {
         const removedPhoto = data.draft.photos[i];
         data.draft.photos.splice(i, 1); renderPhotos(); changed();
