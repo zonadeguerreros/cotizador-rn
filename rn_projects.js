@@ -20,7 +20,7 @@
     return (list || []).map(p => Object.assign({}, p, {
       photos: (p.photos || []).map(ph => ({name: ph.name, caption: ph.caption, storagePath: ph.storagePath || null})),
       avances: (p.avances || []).map(av => ({
-        id: av.id, date: av.date, note: av.note,
+        id: av.id, date: av.date, note: av.note, id: av.id, date: av.date, note: av.note, amount: av.amount || 0,
         attachments: (av.attachments || []).map(a => ({name: a.name, type: a.type, storagePath: a.storagePath || null}))
       }))
     }));
@@ -64,7 +64,7 @@
       representative: p.representative || '', items: p.items || [],
       photos: (p.photos || []).map(ph => ({name: ph.name, caption: ph.caption, storagePath: ph.storagePath || null})),
       avances: (p.avances || []).map(av => ({
-        id: av.id, date: av.date, note: av.note,
+        id: av.id, date: av.date, note: av.note, amount: av.amount || 0,
         attachments: (av.attachments || []).map(a => ({name: a.name, type: a.type, storagePath: a.storagePath || null}))
       })),
       updatedAt: Date.now()
@@ -208,7 +208,7 @@
   function totals() {
     const net = data.draft.items.reduce((sum, row) => sum + row.price, 0);
     const tax = Number((BigInt(net) * 19n + 50n) / 100n);
-    return {net, tax, total: net + tax};
+    return {net, tax, total: net + tax}; } function grandTotals() { const base = totals(); const extra = (data.draft.avances || []).reduce((sum, av) => sum + (av.amount || 0), 0); const net = base.net + extra; const tax = Number((BigInt(net) * 19n + 50n) / 100n); return {net, tax, total: net + tax};
   }
   function updateTotals() {
     const values = totals();
@@ -216,14 +216,14 @@
     renderBudgetTotal();
   }
   function renderBudgetTotal() {
-    const t = totals();
+    const t = grandTotals();
     const set = (id, text) => { const el = document.getElementById(id); if (el) el.textContent = text; };
     set('pr-budget-total-price', fm(t.total));
     set('pr-budget-total-net', fm(t.net));
     set('pr-budget-total-iva', fm(t.tax));
     set('pr-budget-total-total', fm(t.total));
     const rowsEl = document.getElementById('pr-budget-total-rows');
-    if (rowsEl) rowsEl.innerHTML = data.draft.items.map((row, i) => `<tr><td>${i + 1}</td><td>${escape(row.name)}${row.origin ? `<div style="font-size:11px;color:var(--mut);margin-top:2px">Ref.: ${escape(row.origin)}</div>` : ''}</td><td>${escape(row.scope)}</td><td>${fm(row.price)}</td></tr>`).join('');
+    if (rowsEl) { const itemRows = data.draft.items.map((row, i) => `<tr><td>${i + 1}</td><td>${escape(row.name)}${row.origin ? `<div style="font-size:11px;color:var(--mut);margin-top:2px">Ref.: ${escape(row.origin)}</div>` : ''}</td><td>${escape(row.scope)}</td><td>${fm(row.price)}</td></tr>`); const extraRows = (data.draft.avances || []).filter(av => av.amount).map((av, i) => `<tr><td>${data.draft.items.length + i + 1}</td><td>Avance ${escape(av.date)}${av.note ? ` — ${escape(av.note.slice(0, 60))}` : ''}</td><td>Ver avance del ${escape(av.date)}</td><td>${fm(av.amount)}</td></tr>`); rowsEl.innerHTML = itemRows.concat(extraRows).join(''); }
   }
   function renderRows() {
     document.getElementById('pr-rows').innerHTML = data.draft.items.map((row, i) => `<tr><td>${i + 1}</td><td><textarea aria-label="Trabajo ${i + 1}" data-row="${i}" data-key="name" rows="3">${escape(row.name)}</textarea><input aria-label="Referencia de origen ${i + 1}" type="text" data-row="${i}" data-key="origin" value="${escape(row.origin || '')}" placeholder="Ref. opcional si viene de un anexo/avance (ej: Anexo técnico N°1)" style="margin-top:6px;font-size:11px"></td><td><textarea aria-label="Alcance ${i + 1}" data-row="${i}" data-key="scope" rows="3">${escape(row.scope)}</textarea></td><td><input aria-label="Valor neto ${i + 1}" type="number" min="0" max="999999999999" step="1" data-row="${i}" data-key="price" value="${row.price}"></td><td><button class="btn bh xs" data-action="remove-row" data-index="${i}" aria-label="Quitar trabajo ${i + 1}">Quitar</button></td></tr>`).join('');
@@ -241,7 +241,7 @@
     el.innerHTML = list.length ? list.slice().reverse().map(av => {
       const j = list.indexOf(av);
       const atts = (av.attachments || []).map((a, k) => { if (a.type === 'pdf') return `<span class="btn bh xs" data-action="ver-avance-adj" data-av="${j}" data-att="${k}" style="cursor:pointer;margin:4px 6px 0 0;display:inline-block">📄 ${escape(a.name)}</span>`; return `<img class="att-thumb" data-action="ver-avance-adj" data-av="${j}" data-att="${k}" data-path="${escape(a.storagePath || '')}" ${a.data ? `src="${a.data}"` : ''} alt="${escape(a.name)}" title="${escape(a.name)}">`; }).join('');
-      return `<details class="acc avance-item"><summary><span>${escape(av.date)}</span></summary><div class="acc-body"><p class="avance-body-note">${escape(av.note)}</p>${atts ? `<div>${atts}</div>` : ''}<button class="btn bh xs" data-action="remove-avance" data-av="${j}" style="margin-top:10px">Quitar</button></div></details>`;
+      return `<details class="acc avance-item"><summary><span>${escape(av.date)}</span>${av.amount ? `<span style="font-weight:700;color:var(--blue)">+${fm(av.amount)}</span>` : ''}</summary><div class="acc-body"><p class="avance-body-note">${escape(av.note)}</p>${av.amount ? `<p style="font-weight:700;color:var(--blue)">Monto adicional: ${fm(av.amount)}</p>` : ''}${atts ? `<div>${atts}</div>` : ''}<button class="btn bh xs" data-action="remove-avance" data-av="${j}" style="margin-top:10px">Quitar</button></div></details>`;
     }).join('') : '<p style="color:var(--mut)">Aún no hay avances registrados para este proyecto.</p>'; el.querySelectorAll('.att-thumb').forEach(img => { if (!img.getAttribute('src') && img.dataset.path && window.firebase && firebase.storage) { firebase.storage().ref(img.dataset.path).getDownloadURL().then(url => { img.src = url; }).catch(() => {}); } });
   }
   function renderHistory() {
@@ -285,7 +285,7 @@
     <div class="card"><div class="ct">Datos del proyecto</div><div class="g2">${field('number', 'N° de informe / presupuesto')}${field('date', 'Fecha')}${field('title', 'Nombre del proyecto *')}${field('client', 'Titular / cliente *')}${field('location', 'Ubicación del proyecto')}${field('author', 'Elaborado por')}</div></div>
     <div class="card"><div class="ct">Informe técnico</div><p style="margin-bottom:12px;color:var(--mut)">Redacta las secciones que necesites. Las secciones vacías se omiten del PDF. Puedes separar los párrafos con una línea en blanco.</p><div class="pr-sections">${field('intro', 'Introducción', true)}${field('diagnosis', 'Observaciones y diagnóstico de la instalación', true, 'Describe los hallazgos y relaciona las fotografías por número.')}${field('corrections', 'Correcciones y verificaciones recomendadas', true)}${field('references', 'Referencias técnicas', true)}</div></div>
     <div class="card"><div class="ct">Registro fotográfico</div><p style="margin-bottom:12px">Agrega imágenes JPG, PNG o WebP (hasta 60). Se numeran en el orden de carga.</p><input id="pr-file" type="file" accept="image/jpeg,image/png,image/webp" multiple><div id="pr-photos" style="margin-top:16px"></div></div>
-    <div class="card"><div class="ct">Avances del proyecto</div><p style="margin-bottom:12px;color:var(--mut)">Registra aquí las novedades y el avance del trabajo a medida que ocurren. Si le das acceso al cliente de este proyecto, esto es lo que él va a poder ver y descargar.</p><div id="av-list" style="margin-bottom:14px"></div><div class="card" style="background:rgba(0,0,0,.03)"><label class="L" for="av-note">Nueva nota de avance</label><textarea id="av-note" rows="3" placeholder="Ej: Se realizó el levantamiento inicial del tablero..."></textarea><label class="L" style="margin-top:10px" for="av-file">Adjuntar fotos o PDF (opcional)</label><input id="av-file" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" multiple><div id="av-pending" style="margin-top:8px;color:var(--mut);font-size:12px"></div><button class="btn bg sm" data-action="add-avance" style="margin-top:12px">+ Agregar avance</button></div></div>
+    <div class="card"><div class="ct">Avances del proyecto</div><p style="margin-bottom:12px;color:var(--mut)">Registra aquí las novedades y el avance del trabajo a medida que ocurren. Si le das acceso al cliente de este proyecto, esto es lo que él va a poder ver y descargar.</p><div id="av-list" style="margin-bottom:14px"></div><div class="card" style="background:rgba(0,0,0,.03)"><label class="L" for="av-note">Nueva nota de avance</label><textarea id="av-note" rows="3" placeholder="Ej: Se realizó el levantamiento inicial del tablero..."></textarea><label class="L" style="margin-top:10px" for="av-amount">Monto adicional (opcional, si este avance incluye un anexo/presupuesto extra)</label><input id="av-amount" type="number" min="0" max="999999999999" step="1" placeholder="Ej: 108000"><label class="L" style="margin-top:10px" for="av-file">Adjuntar fotos o PDF (opcional)</label><input id="av-file" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" multiple><div id="av-pending" style="margin-top:8px;color:var(--mut);font-size:12px"></div><button class="btn bg sm" data-action="add-avance" style="margin-top:12px">+ Agregar avance</button></div></div>
     <div class="card"><div class="ct">Presupuesto detallado · Solo trabajo</div>${field('scope', 'Alcance incluido', true)}<div style="overflow-x:auto;margin-top:16px"><table class="pr-table"><thead><tr><th>Ítem</th><th>Trabajo</th><th>Alcance incluido</th><th>Valor neto CLP</th><th></th></tr></thead><tbody id="pr-rows"></tbody></table></div><button class="btn bb sm" data-action="add-row" style="margin-top:12px">+ Agregar trabajo</button><div class="card-hi" style="max-width:480px;margin:18px 0 0 auto"><div class="row"><span>Total neto de los servicios</span><strong id="pr-net"></strong></div><div class="row"><span>IVA 19%</span><strong id="pr-tax"></strong></div><div class="row"><strong>Total del servicio con IVA</strong><strong id="pr-total"></strong></div><p style="margin-top:10px;color:var(--mut)">Materiales no incluidos. Cada valor corresponde al total neto del trabajo de esa fila.</p></div></div>
     <div class="card"><div class="ct">Condiciones y aprobación</div><div class="pr-sections">${field('conditions', 'Condiciones de ejecución, pago, plazo y garantía', true)}${field('approval', 'Texto de aprobación del presupuesto', true)}${field('representative', 'Representante R & N para la firma')}</div></div>
     <div class="card"><div class="ct">Acceso del cliente</div><div id="client-access-box"><p style="color:var(--mut)">Cargando…</p></div></div>
@@ -372,13 +372,13 @@
       }
       if (action === 'add-avance') {
         const noteEl = document.getElementById('av-note');
-        const note = noteEl ? noteEl.value.trim() : '';
-        if (!note && !pendingAvanceFiles.length) { alert('Escribe una nota o adjunta al menos un archivo.'); return; }
+        const note = noteEl ? noteEl.value.trim() : ''; const amountEl = document.getElementById('av-amount'); const amountN = amountEl ? Number(amountEl.value) : 0; if (amountEl && amountEl.value && (!Number.isSafeInteger(amountN) || amountN < 0 || amountN > 999999999999)) { alert('El monto adicional debe ser un valor en pesos entero, positivo o cero.'); return; } const amount = Number.isFinite(amountN) && amountN > 0 ? amountN : 0;
+        if (!note && !pendingAvanceFiles.length && !amount) { alert('Escribe una nota, adjunta al menos un archivo o ingresa un monto adicional.'); return; }
         const now = new Date();
         data.draft.avances = data.draft.avances || [];
         data.draft.avances.push({
           id: uid(), date: now.getFullYear() + '-' + p2(now.getMonth() + 1) + '-' + p2(now.getDate()),
-          note: note, attachments: pendingAvanceFiles
+          note: note, amount: amount, attachments: pendingAvanceFiles
         });
         pendingAvanceFiles = [];
         if (noteEl) noteEl.value = '';
