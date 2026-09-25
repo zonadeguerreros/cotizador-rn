@@ -270,7 +270,7 @@ function renderDash(mirror){
     '<details class="acc total"><summary><span>💰 Presupuesto total</span><span>'+fmCLP(total)+'</span></summary>'
     +'<div class="acc-body">'
     +(mirror.scope?'<p style="font-size:13px;color:#e2e8f0;margin-bottom:10px">'+escHtml(mirror.scope)+'</p>':'')
-    +'<table><thead><tr><th>Ítem</th><th>Trabajo</th><th>Alcance</th><th>Valor neto</th></tr></thead><tbody>'+rowsHtml+'</tbody></table>'
+    +'<table><thead><tr><th>Ítem</th><th>Trabajo</th><th>Alcance</th><th>Valor neto</th></tr></thead><tbody>'+rowsHtml+extraRowsHtml+'</tbody></table>'
     +'<div style="max-width:340px;margin:14px 0 0 auto">'
     +'<div class="row"><span>Neto</span><span>'+fmCLP(net)+'</span></div>'
     +'<div class="row"><span>IVA 19%</span><span>'+fmCLP(iva)+'</span></div>'
