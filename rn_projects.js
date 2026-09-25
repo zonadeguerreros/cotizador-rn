@@ -213,6 +213,17 @@
   function updateTotals() {
     const values = totals();
     ['net', 'tax', 'total'].forEach(key => { const el = document.getElementById('pr-' + key); if (el) el.textContent = fm(values[key]); });
+    renderBudgetTotal();
+  }
+  function renderBudgetTotal() {
+    const t = totals();
+    const set = (id, text) => { const el = document.getElementById(id); if (el) el.textContent = text; };
+    set('pr-budget-total-price', fm(t.total));
+    set('pr-budget-total-net', fm(t.net));
+    set('pr-budget-total-iva', fm(t.tax));
+    set('pr-budget-total-total', fm(t.total));
+    const rowsEl = document.getElementById('pr-budget-total-rows');
+    if (rowsEl) rowsEl.innerHTML = data.draft.items.map((row, i) => `<tr><td>${i + 1}</td><td>${escape(row.name)}</td><td>${escape(row.scope)}</td><td>${fm(row.price)}</td></tr>`).join('');
   }
   function renderRows() {
     document.getElementById('pr-rows').innerHTML = data.draft.items.map((row, i) => `<tr><td>${i + 1}</td><td><textarea aria-label="Trabajo ${i + 1}" data-row="${i}" data-key="name" rows="3">${escape(row.name)}</textarea></td><td><textarea aria-label="Alcance ${i + 1}" data-row="${i}" data-key="scope" rows="3">${escape(row.scope)}</textarea></td><td><input aria-label="Valor neto ${i + 1}" type="number" min="0" max="999999999999" step="1" data-row="${i}" data-key="price" value="${row.price}"></td><td><button class="btn bh xs" data-action="remove-row" data-index="${i}" aria-label="Quitar trabajo ${i + 1}">Quitar</button></td></tr>`).join('');
@@ -225,10 +236,12 @@
     const el = document.getElementById('av-list');
     if (!el) return;
     const list = data.draft.avances || [];
+    /* Mas nuevos primero, y cada avance como acordeon plegable para que la
+       lista no quede tediosa de leer cuando hay muchos registrados. */
     el.innerHTML = list.length ? list.slice().reverse().map(av => {
       const j = list.indexOf(av);
       const atts = (av.attachments || []).map((a, k) => `<span class="btn bh xs" data-action="ver-avance-adj" data-av="${j}" data-att="${k}" style="cursor:pointer;margin:4px 6px 0 0;display:inline-block">${a.type === 'pdf' ? '📄' : '🖼'} ${escape(a.name)}</span>`).join('');
-      return `<div class="card" style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><strong>${escape(av.date)}</strong><button class="btn bh xs" data-action="remove-avance" data-av="${j}">Quitar</button></div><p style="margin:8px 0;white-space:pre-wrap">${escape(av.note)}</p>${atts ? `<div>${atts}</div>` : ''}</div>`;
+      return `<details class="acc avance-item"><summary><span>${escape(av.date)}</span></summary><div class="acc-body"><p class="avance-body-note">${escape(av.note)}</p>${atts ? `<div>${atts}</div>` : ''}<button class="btn bh xs" data-action="remove-avance" data-av="${j}" style="margin-top:10px">Quitar</button></div></details>`;
     }).join('') : '<p style="color:var(--mut)">Aún no hay avances registrados para este proyecto.</p>';
   }
   function renderHistory() {
@@ -268,6 +281,7 @@
   window.rProyectos = function () {
     if (!ready) { root.innerHTML = '<div class="card">Conectando con el archivo de proyectos…</div>'; return; }
     root.innerHTML = `<div class="card-hi"><div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap"><div><h2>Proyectos · Mano de obra</h2><p style="margin:8px 0;color:var(--mut)">Informe técnico y presupuesto de trabajos. Valores netos en pesos chilenos; materiales excluidos.</p></div><button class="btn bh" data-action="new">Nuevo proyecto</button></div><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><button class="btn bg" data-action="save">Guardar proyecto</button><button class="btn bb" data-action="pdf">Generar informe PDF</button><button class="btn bb" data-action="budget">Solo presupuesto PDF</button><button class="btn bh" data-action="backup">Exportar proyecto editable</button><label class="btn bh" for="pr-import">Importar proyecto<input id="pr-import" type="file" accept=".json" hidden></label></div><p id="pr-status" role="status" style="margin-top:10px">Borrador guardado automáticamente en este equipo.</p></div>
+    <details class="acc total"><summary><span>💰 Presupuesto total</span><span id="pr-budget-total-price"></span></summary><div class="acc-body"><table class="pr-table" style="min-width:0"><thead><tr><th>Ítem</th><th>Trabajo</th><th>Alcance</th><th>Valor neto</th></tr></thead><tbody id="pr-budget-total-rows"></tbody></table><div style="max-width:340px;margin:14px 0 0 auto"><div class="row"><span>Neto</span><span id="pr-budget-total-net"></span></div><div class="row"><span>IVA 19%</span><span id="pr-budget-total-iva"></span></div><div class="row"><strong>Total</strong><strong id="pr-budget-total-total"></strong></div></div></div></details>
     <div class="card"><div class="ct">Datos del proyecto</div><div class="g2">${field('number', 'N° de informe / presupuesto')}${field('date', 'Fecha')}${field('title', 'Nombre del proyecto *')}${field('client', 'Titular / cliente *')}${field('location', 'Ubicación del proyecto')}${field('author', 'Elaborado por')}</div></div>
     <div class="card"><div class="ct">Informe técnico</div><p style="margin-bottom:12px;color:var(--mut)">Redacta las secciones que necesites. Las secciones vacías se omiten del PDF. Puedes separar los párrafos con una línea en blanco.</p><div class="pr-sections">${field('intro', 'Introducción', true)}${field('diagnosis', 'Observaciones y diagnóstico de la instalación', true, 'Describe los hallazgos y relaciona las fotografías por número.')}${field('corrections', 'Correcciones y verificaciones recomendadas', true)}${field('references', 'Referencias técnicas', true)}</div></div>
     <div class="card"><div class="ct">Registro fotográfico</div><p style="margin-bottom:12px">Agrega imágenes JPG, PNG o WebP (hasta 60). Se numeran en el orden de carga.</p><input id="pr-file" type="file" accept="image/jpeg,image/png,image/webp" multiple><div id="pr-photos" style="margin-top:16px"></div></div>
@@ -288,8 +302,8 @@
         if (!Number.isSafeInteger(n) || n < 0 || n > 999999999999) { el.setCustomValidity('Ingresa un valor en pesos enteros, positivo o cero.'); el.reportValidity(); return; }
         el.setCustomValidity('');
         data.draft.items[Number(el.dataset.row)].price = n;
-        updateTotals();
       } else data.draft.items[Number(el.dataset.row)][el.dataset.key] = el.value;
+      updateTotals();
     } else if (el.dataset.photo !== undefined) data.draft.photos[Number(el.dataset.photo)][el.dataset.key] = el.value;
     else return;
     changed();
