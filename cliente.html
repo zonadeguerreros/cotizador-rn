@@ -259,7 +259,8 @@ function renderDash(mirror){
   var net=(mirror.items||[]).reduce(function(a,it){return a+(it.price||0);},0);
   var iva=Math.round(net*0.19), total=net+iva;
   var rowsHtml=(mirror.items||[]).map(function(it,i){
-    return '<tr><td>'+(i+1)+'</td><td>'+escHtml(it.name)+'</td><td>'+escHtml(it.scope)+'</td><td>'+fmCLP(it.price)+'</td></tr>';
+    var origin=it.origin?'<div style="font-size:11px;color:#64748b;margin-top:2px">Ref.: '+escHtml(it.origin)+'</div>':'';
+    return '<tr><td>'+(i+1)+'</td><td>'+escHtml(it.name)+origin+'</td><td>'+escHtml(it.scope)+'</td><td>'+fmCLP(it.price)+'</td></tr>';
   }).join('');
   /* "Presupuesto total": mirror.items ya incluye tanto las partidas del
      informe original como cualquier ítem nuevo agregado despues (p.ej. un
@@ -294,8 +295,12 @@ function renderDash(mirror){
     return '<details class="acc avance-item"><summary><span>'+escHtml(av.date)+'</span></summary><div class="acc-body"><p>'+escHtml(av.note)+'</p>'+atts+'</div></details>';
   }).join('') : '<p style="color:#64748b">Todavía no hay avances registrados.</p>';
 
+  /* Lo mas nuevo va arriba: el presupuesto (resumen siempre vigente), luego
+     los avances (lo que mas cambia con el tiempo), y al final el informe
+     tecnico original, que es el contenido mas antiguo/estatico. */
   document.getElementById('view-dash').innerHTML =
     budgetTotalHtml
+    +'<div class="card"><div class="ct">Avances del proyecto</div>'+avancesHtml+'</div>'
     +'<div class="card"><div class="ct">'+escHtml(mirror.title||'Proyecto')+'</div>'
     +'<div class="row"><span>Titular</span><span>'+escHtml(mirror.client)+'</span></div>'
     +'<div class="row"><span>Ubicación</span><span>'+escHtml(mirror.location||'—')+'</span></div>'
@@ -308,8 +313,7 @@ function renderDash(mirror){
     +section('Referencias técnicas',mirror.references)
     +photosSection
     +'</div>'
-    +'</div>'
-    +'<div class="card"><div class="ct">Avances del proyecto</div>'+avancesHtml+'</div>';
+    +'</div>';
 
   document.querySelectorAll('.photo-grid img').forEach(function(img){
     var path=img.dataset.path;
