@@ -20,7 +20,7 @@
     return (list || []).map(p => Object.assign({}, p, {
       photos: (p.photos || []).map(ph => ({name: ph.name, caption: ph.caption, storagePath: ph.storagePath || null})),
       avances: (p.avances || []).map(av => ({
-        id: av.id, date: av.date, note: av.note, id: av.id, date: av.date, note: av.note, amount: av.amount || 0,
+        id: av.id, date: av.date, note: av.note, amount: av.amount || 0,
         attachments: (av.attachments || []).map(a => ({name: a.name, type: a.type, storagePath: a.storagePath || null}))
       }))
     }));
