@@ -54,7 +54,7 @@ th{color:#64748b;font-weight:700;font-size:11px;text-transform:uppercase}
 .acc.avance-item summary{background:#fff;font-weight:600;font-size:13px;padding:11px 14px}
 .acc.avance-item .acc-body{padding:0 14px 14px}
 .acc.avance-item .acc-body p{white-space:pre-wrap;font-size:14px;margin:0 0 8px}
-.att{display:inline-block;background:#eef2f7;border-radius:7px;padding:5px 10px;font-size:12px;margin:4px 6px 0 0;cursor:pointer}
+.att{display:inline-block;background:#eef2f7;border-radius:7px;padding:5px 10px;font-size:12px;margin:4px 6px 0 0;cursor:pointer}.att-thumb{width:72px;height:72px;object-fit:cover;border-radius:8px;cursor:pointer;border:1px solid rgba(0,0,0,.1);margin:4px 6px 0 0;background:#eef2f7;vertical-align:top}
 #logout{background:transparent;border:1px solid rgba(255,255,255,.35);color:#fff;font-size:12px;padding:7px 12px}
 #viewer-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:9999;padding:18px;box-sizing:border-box}
 #viewer-box{background:#fff;border-radius:10px;max-width:1000px;height:100%;margin:0 auto;display:flex;flex-direction:column;overflow:hidden}
@@ -290,7 +290,7 @@ function renderDash(mirror){
   var avancesList=(mirror.avances||[]).slice().reverse();
   var avancesHtml=avancesList.length ? avancesList.map(function(av){
     var atts=(av.attachments||[]).map(function(a){
-      return '<span class="att" data-name="'+escHtml(a.name)+'" data-path="'+escHtml(a.storagePath||'')+'" data-type="'+escHtml(a.type||'')+'">'+(a.type==='pdf'?'📄':'🖼')+' '+escHtml(a.name)+'</span>';
+      if(a.type==='pdf') return '<span class="att" data-name="'+escHtml(a.name)+'" data-path="'+escHtml(a.storagePath||'')+'" data-type="pdf">📄 '+escHtml(a.name)+'</span>'; return '<img class="att-thumb" data-name="'+escHtml(a.name)+'" data-path="'+escHtml(a.storagePath||'')+'" data-type="image" alt="'+escHtml(a.name)+'" title="'+escHtml(a.name)+'">';
     }).join('');
     return '<details class="acc avance-item"><summary><span>'+escHtml(av.date)+'</span></summary><div class="acc-body"><p>'+escHtml(av.note)+'</p>'+atts+'</div></details>';
   }).join('') : '<p style="color:#64748b">Todavía no hay avances registrados.</p>';
@@ -321,7 +321,7 @@ function renderDash(mirror){
     img.onclick=function(){ if(path) openViewer(img.dataset.name,path,false); };
   });
   document.querySelectorAll('.att').forEach(function(el){
-    el.onclick=function(){ if(el.dataset.path) openViewer(el.dataset.name,el.dataset.path,el.dataset.type==='pdf'); };
+    el.onclick=function(){ if(el.dataset.path) openViewer(el.dataset.name,el.dataset.path,el.dataset.type==='pdf'); }; }); document.querySelectorAll('.att-thumb').forEach(function(img){ var path=img.dataset.path; if(path) firebase.storage().ref(path).getDownloadURL().then(function(url){img.src=url;}).catch(function(){}); img.onclick=function(){ if(path) openViewer(img.dataset.name,path,false); };
   });
   showView('view-dash');
 }
