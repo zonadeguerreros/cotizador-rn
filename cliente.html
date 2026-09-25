@@ -41,9 +41,19 @@ th,td{padding:7px 8px;text-align:left;border-bottom:1px solid rgba(0,0,0,.07)}
 th{color:#64748b;font-weight:700;font-size:11px;text-transform:uppercase}
 .photo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px;margin-top:10px}
 .photo-grid img{width:100%;height:100px;object-fit:cover;border-radius:8px;cursor:pointer;border:1px solid rgba(0,0,0,.08)}
-.avance{border-left:3px solid #2b6fe0;padding:10px 0 10px 14px;margin-bottom:12px}
-.avance .date{font-weight:800;color:#163f78;font-size:13px}
-.avance p{margin:6px 0;white-space:pre-wrap;font-size:14px}
+.acc{border:1px solid rgba(0,0,0,.08);border-radius:10px;margin-bottom:10px;overflow:hidden;background:#fff}
+.acc summary{list-style:none;cursor:pointer;padding:13px 16px;display:flex;justify-content:space-between;align-items:center;gap:10px;font-weight:700;color:#163f78;background:#f8fafc;font-size:14px}
+.acc summary::-webkit-details-marker{display:none}
+.acc summary::after{content:'▸';color:#94a3b8;font-size:13px;transition:transform .15s;flex:none}
+.acc[open] summary::after{transform:rotate(90deg)}
+.acc-body{padding:4px 16px 16px}
+.acc.total{border-color:#163f78;margin-bottom:16px}
+.acc.total summary{background:linear-gradient(155deg,#163f78 0%,#0d2a54 100%);color:#fff;font-size:15px}
+.acc.total summary::after{color:#b9c6de}
+.acc.total .acc-body{padding-top:14px}
+.acc.avance-item summary{background:#fff;font-weight:600;font-size:13px;padding:11px 14px}
+.acc.avance-item .acc-body{padding:0 14px 14px}
+.acc.avance-item .acc-body p{white-space:pre-wrap;font-size:14px;margin:0 0 8px}
 .att{display:inline-block;background:#eef2f7;border-radius:7px;padding:5px 10px;font-size:12px;margin:4px 6px 0 0;cursor:pointer}
 #logout{background:transparent;border:1px solid rgba(255,255,255,.35);color:#fff;font-size:12px;padding:7px 12px}
 #viewer-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:9999;padding:18px;box-sizing:border-box}
@@ -251,40 +261,53 @@ function renderDash(mirror){
   var rowsHtml=(mirror.items||[]).map(function(it,i){
     return '<tr><td>'+(i+1)+'</td><td>'+escHtml(it.name)+'</td><td>'+escHtml(it.scope)+'</td><td>'+fmCLP(it.price)+'</td></tr>';
   }).join('');
-  function section(title,text){
-    if(!text||!text.trim())return'';
-    return '<div class="ct" style="margin-top:16px">'+escHtml(title)+'</div><p style="white-space:pre-wrap;font-size:14px;color:#334155">'+escHtml(text)+'</p>';
-  }
-  var photosHtml=(mirror.photos||[]).length ? '<div class="photo-grid">'+mirror.photos.map(function(ph,i){
-    return '<img data-name="'+escHtml(ph.name||('Foto '+(i+1)))+'" data-path="'+escHtml(ph.storagePath||'')+'" alt="'+escHtml(ph.name||'')+'">';
-  }).join('')+'</div>' : '';
-  var avancesList=(mirror.avances||[]).slice().reverse();
-  var avancesHtml=avancesList.length ? avancesList.map(function(av){
-    var atts=(av.attachments||[]).map(function(a){
-      return '<span class="att" data-name="'+escHtml(a.name)+'" data-path="'+escHtml(a.storagePath||'')+'" data-type="'+escHtml(a.type||'')+'">'+(a.type==='pdf'?'📄':'🖼')+' '+escHtml(a.name)+'</span>';
-    }).join('');
-    return '<div class="avance"><div class="date">'+escHtml(av.date)+'</div><p>'+escHtml(av.note)+'</p>'+atts+'</div>';
-  }).join('') : '<p style="color:#64748b">Todavía no hay avances registrados.</p>';
-
-  document.getElementById('view-dash').innerHTML =
-    '<div class="card"><div class="ct">'+escHtml(mirror.title||'Proyecto')+'</div>'
-    +'<div class="row"><span>Titular</span><span>'+escHtml(mirror.client)+'</span></div>'
-    +'<div class="row"><span>Ubicación</span><span>'+escHtml(mirror.location||'—')+'</span></div>'
-    +'<div class="row"><span>Fecha del informe</span><span>'+escHtml(mirror.date||'—')+'</span></div>'
-    +'<div class="row"><span>N° de informe</span><span>'+escHtml(mirror.number||'—')+'</span></div>'
-    +section('Introducción',mirror.intro)
-    +section('Observaciones y diagnóstico',mirror.diagnosis)
-    +section('Correcciones y verificaciones recomendadas',mirror.corrections)
-    +section('Referencias técnicas',mirror.references)
-    +(photosHtml?'<div class="ct" style="margin-top:16px">Registro fotográfico</div>'+photosHtml:'')
-    +'</div>'
-    +'<div class="card"><div class="ct">Presupuesto de trabajos</div>'
-    +(mirror.scope?'<p style="font-size:13px;color:#475569;margin-bottom:10px">'+escHtml(mirror.scope)+'</p>':'')
+  /* "Presupuesto total": mirror.items ya incluye tanto las partidas del
+     informe original como cualquier ítem nuevo agregado despues (p.ej. un
+     anexo tecnico), asi que esta tabla siempre refleja el total combinado
+     y actualizado. */
+  var budgetTotalHtml=
+    '<details class="acc total"><summary><span>💰 Presupuesto total</span><span>'+fmCLP(total)+'</span></summary>'
+    +'<div class="acc-body">'
+    +(mirror.scope?'<p style="font-size:13px;color:#e2e8f0;margin-bottom:10px">'+escHtml(mirror.scope)+'</p>':'')
     +'<table><thead><tr><th>Ítem</th><th>Trabajo</th><th>Alcance</th><th>Valor neto</th></tr></thead><tbody>'+rowsHtml+'</tbody></table>'
     +'<div style="max-width:340px;margin:14px 0 0 auto">'
     +'<div class="row"><span>Neto</span><span>'+fmCLP(net)+'</span></div>'
     +'<div class="row"><span>IVA 19%</span><span>'+fmCLP(iva)+'</span></div>'
     +'<div class="row"><strong>Total</strong><strong>'+fmCLP(total)+'</strong></div></div>'
+    +'</div></details>';
+
+  function section(title,text){
+    if(!text||!text.trim())return'';
+    return '<details class="acc"><summary><span>'+escHtml(title)+'</span></summary><div class="acc-body"><p style="white-space:pre-wrap;font-size:14px;color:#334155">'+escHtml(text)+'</p></div></details>';
+  }
+  var photosHtml=(mirror.photos||[]).length ? '<div class="photo-grid">'+mirror.photos.map(function(ph,i){
+    return '<img data-name="'+escHtml(ph.name||('Foto '+(i+1)))+'" data-path="'+escHtml(ph.storagePath||'')+'" alt="'+escHtml(ph.name||'')+'">';
+  }).join('')+'</div>' : '';
+  var photosSection = photosHtml ? '<details class="acc"><summary><span>Registro fotográfico</span></summary><div class="acc-body">'+photosHtml+'</div></details>' : '';
+
+  /* Avances: los mas nuevos primero (el ultimo agregado queda arriba). */
+  var avancesList=(mirror.avances||[]).slice().reverse();
+  var avancesHtml=avancesList.length ? avancesList.map(function(av){
+    var atts=(av.attachments||[]).map(function(a){
+      return '<span class="att" data-name="'+escHtml(a.name)+'" data-path="'+escHtml(a.storagePath||'')+'" data-type="'+escHtml(a.type||'')+'">'+(a.type==='pdf'?'📄':'🖼')+' '+escHtml(a.name)+'</span>';
+    }).join('');
+    return '<details class="acc avance-item"><summary><span>'+escHtml(av.date)+'</span></summary><div class="acc-body"><p>'+escHtml(av.note)+'</p>'+atts+'</div></details>';
+  }).join('') : '<p style="color:#64748b">Todavía no hay avances registrados.</p>';
+
+  document.getElementById('view-dash').innerHTML =
+    budgetTotalHtml
+    +'<div class="card"><div class="ct">'+escHtml(mirror.title||'Proyecto')+'</div>'
+    +'<div class="row"><span>Titular</span><span>'+escHtml(mirror.client)+'</span></div>'
+    +'<div class="row"><span>Ubicación</span><span>'+escHtml(mirror.location||'—')+'</span></div>'
+    +'<div class="row"><span>Fecha del informe</span><span>'+escHtml(mirror.date||'—')+'</span></div>'
+    +'<div class="row"><span>N° de informe</span><span>'+escHtml(mirror.number||'—')+'</span></div>'
+    +'<div style="margin-top:14px">'
+    +section('Introducción',mirror.intro)
+    +section('Observaciones y diagnóstico',mirror.diagnosis)
+    +section('Correcciones y verificaciones recomendadas',mirror.corrections)
+    +section('Referencias técnicas',mirror.references)
+    +photosSection
+    +'</div>'
     +'</div>'
     +'<div class="card"><div class="ct">Avances del proyecto</div>'+avancesHtml+'</div>';
 
