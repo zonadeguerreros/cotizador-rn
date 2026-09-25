@@ -223,10 +223,10 @@
     set('pr-budget-total-iva', fm(t.tax));
     set('pr-budget-total-total', fm(t.total));
     const rowsEl = document.getElementById('pr-budget-total-rows');
-    if (rowsEl) rowsEl.innerHTML = data.draft.items.map((row, i) => `<tr><td>${i + 1}</td><td>${escape(row.name)}</td><td>${escape(row.scope)}</td><td>${fm(row.price)}</td></tr>`).join('');
+    if (rowsEl) rowsEl.innerHTML = data.draft.items.map((row, i) => `<tr><td>${i + 1}</td><td>${escape(row.name)}${row.origin ? `<div style="font-size:11px;color:var(--mut);margin-top:2px">Ref.: ${escape(row.origin)}</div>` : ''}</td><td>${escape(row.scope)}</td><td>${fm(row.price)}</td></tr>`).join('');
   }
   function renderRows() {
-    document.getElementById('pr-rows').innerHTML = data.draft.items.map((row, i) => `<tr><td>${i + 1}</td><td><textarea aria-label="Trabajo ${i + 1}" data-row="${i}" data-key="name" rows="3">${escape(row.name)}</textarea></td><td><textarea aria-label="Alcance ${i + 1}" data-row="${i}" data-key="scope" rows="3">${escape(row.scope)}</textarea></td><td><input aria-label="Valor neto ${i + 1}" type="number" min="0" max="999999999999" step="1" data-row="${i}" data-key="price" value="${row.price}"></td><td><button class="btn bh xs" data-action="remove-row" data-index="${i}" aria-label="Quitar trabajo ${i + 1}">Quitar</button></td></tr>`).join('');
+    document.getElementById('pr-rows').innerHTML = data.draft.items.map((row, i) => `<tr><td>${i + 1}</td><td><textarea aria-label="Trabajo ${i + 1}" data-row="${i}" data-key="name" rows="3">${escape(row.name)}</textarea><input aria-label="Referencia de origen ${i + 1}" type="text" data-row="${i}" data-key="origin" value="${escape(row.origin || '')}" placeholder="Ref. opcional si viene de un anexo/avance (ej: Anexo técnico N°1)" style="margin-top:6px;font-size:11px"></td><td><textarea aria-label="Alcance ${i + 1}" data-row="${i}" data-key="scope" rows="3">${escape(row.scope)}</textarea></td><td><input aria-label="Valor neto ${i + 1}" type="number" min="0" max="999999999999" step="1" data-row="${i}" data-key="price" value="${row.price}"></td><td><button class="btn bh xs" data-action="remove-row" data-index="${i}" aria-label="Quitar trabajo ${i + 1}">Quitar</button></td></tr>`).join('');
     updateTotals();
   }
   function renderPhotos() {
