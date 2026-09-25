@@ -257,7 +257,7 @@ document.getElementById('form-login').addEventListener('submit',async function(e
 function fmCLP(n){return new Intl.NumberFormat('es-CL',{style:'currency',currency:'CLP',maximumFractionDigits:0}).format(n||0);}
 function renderDash(mirror){
   var net=(mirror.items||[]).reduce(function(a,it){return a+(it.price||0);},0);
-  var iva=Math.round(net*0.19), total=net+iva;
+  var avanceExtras=(mirror.avances||[]).filter(function(av){return av.amount;}); var extraRowsHtml=avanceExtras.map(function(av,i){return '<tr><td>'+((mirror.items||[]).length+i+1)+'</td><td>Avance '+escHtml(av.date)+(av.note?' — '+escHtml(av.note.slice(0,60)):'')+'</td><td>Ver avance del '+escHtml(av.date)+'</td><td>'+fmCLP(av.amount)+'</td></tr>';}).join(''); net+=avanceExtras.reduce(function(a,av){return a+(av.amount||0);},0); var iva=Math.round(net*0.19), total=net+iva;
   var rowsHtml=(mirror.items||[]).map(function(it,i){
     var origin=it.origin?'<div style="font-size:11px;color:#64748b;margin-top:2px">Ref.: '+escHtml(it.origin)+'</div>':'';
     return '<tr><td>'+(i+1)+'</td><td>'+escHtml(it.name)+origin+'</td><td>'+escHtml(it.scope)+'</td><td>'+fmCLP(it.price)+'</td></tr>';
@@ -292,7 +292,7 @@ function renderDash(mirror){
     var atts=(av.attachments||[]).map(function(a){
       if(a.type==='pdf') return '<span class="att" data-name="'+escHtml(a.name)+'" data-path="'+escHtml(a.storagePath||'')+'" data-type="pdf">📄 '+escHtml(a.name)+'</span>'; return '<img class="att-thumb" data-name="'+escHtml(a.name)+'" data-path="'+escHtml(a.storagePath||'')+'" data-type="image" alt="'+escHtml(a.name)+'" title="'+escHtml(a.name)+'">';
     }).join('');
-    return '<details class="acc avance-item"><summary><span>'+escHtml(av.date)+'</span></summary><div class="acc-body"><p>'+escHtml(av.note)+'</p>'+atts+'</div></details>';
+    var amountBadge=av.amount?'<span style="font-weight:700">+'+fmCLP(av.amount)+'</span>':''; var amountLine=av.amount?'<p style="font-weight:700;color:#163f78">Monto adicional: '+fmCLP(av.amount)+'</p>':''; return '<details class="acc avance-item"><summary><span>'+escHtml(av.date)+'</span>'+amountBadge+'</summary><div class="acc-body"><p>'+escHtml(av.note)+'</p>'+amountLine+atts+'</div></details>';
   }).join('') : '<p style="color:#64748b">Todavía no hay avances registrados.</p>';
 
   /* Lo mas nuevo va arriba: el presupuesto (resumen siempre vigente), luego
