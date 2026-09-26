@@ -294,7 +294,10 @@
         if (a.type === 'pdf') return `<span class="btn bh xs" data-action="ver-avance-adj" data-av="${j}" data-att="${k}" style="cursor:pointer;margin:4px 6px 0 0;display:inline-block">📄 ${escape(a.name)}</span>`;
         return `<img class="att-thumb" data-action="ver-avance-adj" data-av="${j}" data-att="${k}" data-path="${escape(a.storagePath || '')}" ${a.data ? `src="${a.data}"` : ''} alt="${escape(a.name)}" title="${escape(a.name)}">`;
       }).join('');
-      return `<details class="acc avance-item"><summary><span>${escape(av.date)}</span>${av.amount ? `<span style="font-weight:700;color:var(--blue)">+${fm(av.amount)}</span>` : ''}</summary><div class="acc-body"><p class="avance-body-note">${escape(av.note)}</p>${av.amount ? `<p style="font-weight:700;color:var(--blue)">Monto adicional: ${fm(av.amount)}</p>` : ''}${atts ? `<div>${atts}</div>` : ''}<button class="btn bh xs" data-action="remove-avance" data-av="${j}" style="margin-top:10px">Quitar</button></div></details>`;
+      const clientApprovalHtml = av.clientAgreed
+        ? `<p style="font-weight:700;color:#166534">✅ Aprobado por el cliente${av.clientSignature ? '' : ' (sin firma)'}</p>${av.clientSignature ? `<img src="${av.clientSignature}" alt="Firma del cliente" style="max-width:200px;border:1px solid var(--bd);border-radius:8px;background:#fff;display:block;margin-bottom:8px">` : ''}`
+        : `<p style="color:var(--mut)">El cliente aún no ha aprobado este avance.</p>`;
+      return `<details class="acc avance-item"><summary><span>${escape(av.date)}</span>${av.amount ? `<span style="font-weight:700;color:var(--blue)">+${fm(av.amount)}</span>` : ''}</summary><div class="acc-body"><p class="avance-body-note">${escape(av.note)}</p>${av.amount ? `<p style="font-weight:700;color:var(--blue)">Monto adicional: ${fm(av.amount)}</p>` : ''}${atts ? `<div>${atts}</div>` : ''}${clientApprovalHtml}<button class="btn bh xs" data-action="remove-avance" data-av="${j}" style="margin-top:10px">Quitar</button></div></details>`;
     }).join('') : '<p style="color:var(--mut)">Aún no hay avances registrados para este proyecto.</p>';
     el.querySelectorAll('.att-thumb').forEach(img => {
       if (!img.getAttribute('src') && img.dataset.path && window.firebase && firebase.storage) {
@@ -331,8 +334,18 @@
            verdad en su cuenta de Firestore) para que el generador de PDF,
            que no tiene acceso a la nube en ese momento, pueda incluirla. */
         const newClientSig = (acc && acc.signature) || '';
-        if (data.draft.id === projectId && data.draft.clientSignatureCache !== newClientSig) {
+        const approvals = (acc && acc.avanceApprovals) || {};
+        let avancesChanged = false;
+        if (data.draft.id === projectId) {
+          (data.draft.avances || []).forEach(av => {
+            const ap = approvals[av.id];
+            const agreed = !!(ap && ap.agreed), sig = (ap && ap.signature) || '';
+            if (av.clientAgreed !== agreed || av.clientSignature !== sig) { av.clientAgreed = agreed; av.clientSignature = sig; avancesChanged = true; }
+          });
+        }
+        if (data.draft.id === projectId && (data.draft.clientSignatureCache !== newClientSig || avancesChanged)) {
           data.draft.clientSignatureCache = newClientSig;
+          renderAvances();
           changed();
           syncDraftToSavedProject();
         }

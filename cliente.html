@@ -376,8 +376,8 @@ function fmCLP(n){return new Intl.NumberFormat('es-CL',{style:'currency',currenc
 
 /* === Firma digital (dibujada a mano o imagen adjunta) === */
 var clientSigEditing=false, clientSigPendingUpload=null, clientSigHasDrawn=false;
-function initSignaturePad(canvasId){
-  var canvas=document.getElementById(canvasId);
+function initSignaturePad(canvasOrId, onDraw){
+  var canvas=(typeof canvasOrId==='string') ? document.getElementById(canvasOrId) : canvasOrId;
   if(!canvas) return;
   var ctx=canvas.getContext('2d');
   ctx.strokeStyle='#111'; ctx.lineWidth=2.4; ctx.lineCap='round'; ctx.lineJoin='round';
@@ -393,7 +393,7 @@ function initSignaturePad(canvasId){
     if(!drawing) return;
     var p=pos(e);
     ctx.beginPath(); ctx.moveTo(last.x,last.y); ctx.lineTo(p.x,p.y); ctx.stroke();
-    last=p; clientSigHasDrawn=true; e.preventDefault();
+    last=p; if(onDraw) onDraw(); else clientSigHasDrawn=true; e.preventDefault();
   }
   function end(){ drawing=false; }
   canvas.addEventListener('mousedown',start);
@@ -415,7 +415,8 @@ async function fileToPngDataUrl(file){
     return canvas.toDataURL('image/png');
   } finally { URL.revokeObjectURL(url); }
 }
-function renderDash(mirror, clientSignature){
+function renderDash(mirror, clientSignature, avanceApprovals){
+  avanceApprovals=avanceApprovals||{};
   var net=(mirror.items||[]).reduce(function(a,it){return a+(it.price||0);},0);
   var rowsHtml=(mirror.items||[]).map(function(it,i){
     var origin=it.origin?'<div style="font-size:11px;color:#64748b;margin-top:2px">Ref.: '+escHtml(it.origin)+'</div>':'';
@@ -526,7 +527,26 @@ function renderDash(mirror, clientSignature){
     }).join('');
     var amountBadge=av.amount?'<span style="font-weight:700">+'+fmCLP(av.amount)+'</span>':'';
     var amountLine=av.amount?'<p style="font-weight:700;color:#163f78">Monto adicional: '+fmCLP(av.amount)+'</p>':'';
-    return '<details class="acc avance-item"><summary><span>'+escHtml(av.date)+'</span>'+amountBadge+'</summary><div class="acc-body"><p>'+escHtml(av.note)+'</p>'+amountLine+atts+'</div></details>';
+    var approval=avanceApprovals[av.id];
+    var approvalHtml;
+    if(approval && approval.agreed){
+      approvalHtml='<div style="margin-top:12px;padding-top:12px;border-top:1px solid rgba(0,0,0,.06)">'
+        +'<p style="color:#166534;font-weight:700;font-size:13px">✅ Leíste y aprobaste este avance</p>'
+        +(approval.signature?'<img src="'+approval.signature+'" alt="Tu firma" style="max-width:220px;border:1px solid rgba(0,0,0,.1);border-radius:8px;background:#fff;display:block;margin-top:6px">':'')
+        +'</div>';
+    } else {
+      approvalHtml='<div class="av-approval" data-avid="'+escHtml(av.id)+'" style="margin-top:12px;padding-top:12px;border-top:1px solid rgba(0,0,0,.06)">'
+        +'<label style="display:flex;align-items:center;gap:8px;font-size:13px;margin-bottom:8px;cursor:pointer"><input type="checkbox" class="av-agree-check"> He leído y estoy de acuerdo con este avance</label>'
+        +'<canvas class="av-sig-canvas" width="300" height="110" style="border:1px solid rgba(0,0,0,.16);border-radius:8px;background:#fff;touch-action:none;cursor:crosshair;display:block;max-width:100%"></canvas>'
+        +'<div class="av-sig-preview" style="margin-top:8px"></div>'
+        +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">'
+        +'<button type="button" class="btn-sm btn-outline av-sig-clear">Limpiar</button>'
+        +'<label class="btn-sm btn-outline" style="cursor:pointer;display:inline-block">Adjuntar imagen<input type="file" class="av-sig-file" accept="image/jpeg,image/png,image/webp" hidden></label>'
+        +'<button type="button" class="btn-sm av-sig-save" style="background:#163f78;color:#fff;border:0;cursor:pointer">Guardar aprobación</button>'
+        +'</div><div class="av-msg" style="min-height:16px;margin-top:6px;font-size:12px;color:#b91c1c"></div>'
+        +'</div>';
+    }
+    return '<details class="acc avance-item"><summary><span>'+escHtml(av.date)+'</span>'+amountBadge+'</summary><div class="acc-body"><p>'+escHtml(av.note)+'</p>'+amountLine+atts+approvalHtml+'</div></details>';
   }).join('') : '<p style="color:#64748b">Todavía no hay avances registrados.</p>';
 
   /* Lo mas nuevo va arriba: el presupuesto (resumen siempre vigente), luego
@@ -568,9 +588,9 @@ function renderDash(mirror, clientSignature){
   clientSigPendingUpload=null; clientSigHasDrawn=false;
   if(showSigPad) initSignaturePad('client-sig-canvas');
   var sigEdit=document.getElementById('client-sig-edit');
-  if(sigEdit) sigEdit.onclick=function(){ clientSigEditing=true; renderDash(mirror, clientSignature); };
+  if(sigEdit) sigEdit.onclick=function(){ clientSigEditing=true; renderDash(mirror, clientSignature, avanceApprovals); };
   var sigCancel=document.getElementById('client-sig-cancel');
-  if(sigCancel) sigCancel.onclick=function(){ clientSigEditing=false; renderDash(mirror, clientSignature); };
+  if(sigCancel) sigCancel.onclick=function(){ clientSigEditing=false; renderDash(mirror, clientSignature, avanceApprovals); };
   var sigClear=document.getElementById('client-sig-clear');
   if(sigClear) sigClear.onclick=function(){
     clientSigPendingUpload=null; clientSigHasDrawn=false;
@@ -599,9 +619,45 @@ function renderDash(mirror, clientSignature){
     try{
       await db.collection('clientAccounts').doc(auth.currentUser.uid).update({signature:dataUrl, signedAt:Date.now()});
       clientSigEditing=false;
-      renderDash(mirror, dataUrl);
+      renderDash(mirror, dataUrl, avanceApprovals);
     }catch(e){ msg.textContent='No se pudo guardar: '+((e&&e.message)||String(e)); sigSave.disabled=false; }
   };
+
+  document.querySelectorAll('.av-approval').forEach(function(block){
+    var avId=block.dataset.avid;
+    var canvas=block.querySelector('.av-sig-canvas');
+    var hasDrawn=false, pendingUpload=null;
+    initSignaturePad(canvas, function(){ hasDrawn=true; });
+    block.querySelector('.av-sig-clear').onclick=function(){
+      hasDrawn=false; pendingUpload=null;
+      canvas.getContext('2d').clearRect(0,0,canvas.width,canvas.height);
+      block.querySelector('.av-sig-preview').innerHTML='';
+    };
+    block.querySelector('.av-sig-file').addEventListener('change', async function(e){
+      var file=e.target.files[0];
+      if(!file) return;
+      var msg=block.querySelector('.av-msg'); msg.textContent='';
+      try{
+        pendingUpload=await fileToPngDataUrl(file);
+        block.querySelector('.av-sig-preview').innerHTML='<img src="'+pendingUpload+'" alt="Vista previa" style="max-width:200px;border:1px solid rgba(0,0,0,.1);border-radius:8px;background:#fff">';
+      }catch(err){ msg.textContent=(err&&err.message)||String(err); }
+    });
+    block.querySelector('.av-sig-save').onclick=async function(){
+      var msg=block.querySelector('.av-msg'); msg.textContent='';
+      var agreed=block.querySelector('.av-agree-check').checked;
+      if(!agreed){ msg.textContent='Marca la casilla "He leído y estoy de acuerdo" antes de guardar.'; return; }
+      if(!pendingUpload && !hasDrawn){ msg.textContent='Dibuja tu firma o adjunta una imagen antes de guardar.'; return; }
+      var dataUrl=pendingUpload || canvas.toDataURL('image/png');
+      var btn=block.querySelector('.av-sig-save'); btn.disabled=true;
+      try{
+        var update={}; update['avanceApprovals.'+avId]={agreed:true, signature:dataUrl, signedAt:Date.now()};
+        await db.collection('clientAccounts').doc(auth.currentUser.uid).update(update);
+        var newApprovals=Object.assign({}, avanceApprovals);
+        newApprovals[avId]={agreed:true, signature:dataUrl};
+        renderDash(mirror, clientSignature, newApprovals);
+      }catch(err){ msg.textContent='No se pudo guardar: '+((err&&err.message)||String(err)); btn.disabled=false; }
+    };
+  });
 
   showView('view-dash');
 }
@@ -616,7 +672,7 @@ auth.onAuthStateChanged(async function(user){
     if(acc.status!=='approved'){ showView('view-rejected'); return; }
     var mirrorDoc=await db.collection('clientView').doc(acc.projectId).get();
     if(!mirrorDoc.exists || !mirrorDoc.data().clientApproved){ showView('view-pending'); return; }
-    renderDash(mirrorDoc.data(), acc.signature||'');
+    renderDash(mirrorDoc.data(), acc.signature||'', acc.avanceApprovals||{});
   }catch(e){
     if(e&&e.code==='permission-denied'){
       /* El acceso a este proyecto fue revocado, o todavia no esta aprobado. */
