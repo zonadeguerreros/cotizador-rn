@@ -373,7 +373,49 @@ document.getElementById('form-account').addEventListener('submit',async function
 
 /* === Panel del cliente === */
 function fmCLP(n){return new Intl.NumberFormat('es-CL',{style:'currency',currency:'CLP',maximumFractionDigits:0}).format(n||0);}
-function renderDash(mirror){
+
+/* === Firma digital (dibujada a mano o imagen adjunta) === */
+var clientSigEditing=false, clientSigPendingUpload=null, clientSigHasDrawn=false;
+function initSignaturePad(canvasId){
+  var canvas=document.getElementById(canvasId);
+  if(!canvas) return;
+  var ctx=canvas.getContext('2d');
+  ctx.strokeStyle='#111'; ctx.lineWidth=2.4; ctx.lineCap='round'; ctx.lineJoin='round';
+  var drawing=false, last=null;
+  function pos(e){
+    var r=canvas.getBoundingClientRect();
+    var t=e.touches&&e.touches[0];
+    var cx=(t?t.clientX:e.clientX)-r.left, cy=(t?t.clientY:e.clientY)-r.top;
+    return {x:cx*(canvas.width/r.width), y:cy*(canvas.height/r.height)};
+  }
+  function start(e){ drawing=true; last=pos(e); e.preventDefault(); }
+  function move(e){
+    if(!drawing) return;
+    var p=pos(e);
+    ctx.beginPath(); ctx.moveTo(last.x,last.y); ctx.lineTo(p.x,p.y); ctx.stroke();
+    last=p; clientSigHasDrawn=true; e.preventDefault();
+  }
+  function end(){ drawing=false; }
+  canvas.addEventListener('mousedown',start);
+  canvas.addEventListener('mousemove',move);
+  window.addEventListener('mouseup',end);
+  canvas.addEventListener('touchstart',start,{passive:false});
+  canvas.addEventListener('touchmove',move,{passive:false});
+  canvas.addEventListener('touchend',end);
+}
+async function fileToPngDataUrl(file){
+  if(!['image/jpeg','image/png','image/webp'].includes(file.type)) throw new Error('Usa una imagen JPG, PNG o WebP.');
+  if(file.size>3*1024*1024) throw new Error('La imagen es demasiado grande (máx. 3 MB).');
+  var image=new Image(), url=URL.createObjectURL(file);
+  try{
+    await new Promise(function(resolve,reject){ image.onload=resolve; image.onerror=function(){reject(new Error('No se pudo leer la imagen.'));}; image.src=url; });
+    var scale=Math.min(1, 500/Math.max(image.naturalWidth,image.naturalHeight));
+    var canvas=document.createElement('canvas'); canvas.width=Math.round(image.naturalWidth*scale); canvas.height=Math.round(image.naturalHeight*scale);
+    var ctx=canvas.getContext('2d'); ctx.drawImage(image,0,0,canvas.width,canvas.height);
+    return canvas.toDataURL('image/png');
+  } finally { URL.revokeObjectURL(url); }
+}
+function renderDash(mirror, clientSignature){
   var net=(mirror.items||[]).reduce(function(a,it){return a+(it.price||0);},0);
   var rowsHtml=(mirror.items||[]).map(function(it,i){
     var origin=it.origin?'<div style="font-size:11px;color:#64748b;margin-top:2px">Ref.: '+escHtml(it.origin)+'</div>':'';
@@ -446,6 +488,30 @@ function renderDash(mirror){
     +'<div class="row"><span>Plano / AutoCAD</span><span>'+(mirror.planoDone?'✅ Listo':'⬜ Pendiente')+'</span></div>'
     +(progressItemsHtml?'<div style="margin-top:10px">'+progressItemsHtml+'</div>':'')
     +'</div></details>';
+
+  var ownerSigHtml = mirror.ownerSignature
+    ? '<img src="'+mirror.ownerSignature+'" alt="Firma de R & N" style="max-width:260px;border:1px solid rgba(0,0,0,.1);border-radius:8px;background:#fff;display:block">'
+    : '<p style="color:#64748b;font-size:13px">R &amp; N aún no ha firmado.</p>';
+  var showSigPad = !clientSignature || clientSigEditing;
+  var clientSigHtml = showSigPad
+    ? '<canvas id="client-sig-canvas" width="320" height="130" style="border:1px solid rgba(0,0,0,.16);border-radius:8px;background:#fff;touch-action:none;cursor:crosshair;display:block;max-width:100%"></canvas>'
+      +'<div id="client-sig-preview" style="margin-top:8px"></div>'
+      +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">'
+      +'<button type="button" class="btn-sm btn-outline" id="client-sig-clear">Limpiar</button>'
+      +'<label class="btn-sm btn-outline" for="client-sig-file" style="cursor:pointer;display:inline-block">Adjuntar imagen<input id="client-sig-file" type="file" accept="image/jpeg,image/png,image/webp" hidden></label>'
+      +'<button type="button" class="btn-sm" style="background:#163f78;color:#fff;border:0;cursor:pointer" id="client-sig-save">Guardar mi firma</button>'
+      +(clientSignature?'<button type="button" class="btn-sm btn-outline" id="client-sig-cancel">Cancelar</button>':'')
+      +'</div><div id="client-sig-msg" style="min-height:16px;margin-top:6px;font-size:12px;color:#b91c1c"></div>'
+    : '<img src="'+clientSignature+'" alt="Tu firma" style="max-width:260px;border:1px solid rgba(0,0,0,.1);border-radius:8px;background:#fff;display:block;margin-bottom:10px">'
+      +'<button type="button" class="btn-sm btn-outline" id="client-sig-edit">Cambiar mi firma</button>';
+  var signatureHtml =
+    '<details class="acc"><summary><span>✍️ Firma digital</span></summary><div class="acc-body">'
+    +'<p style="font-weight:700;font-size:13px;margin-bottom:6px;color:#163f78">Firma de R &amp; N</p>'
+    +ownerSigHtml
+    +'<p style="font-weight:700;font-size:13px;margin:16px 0 6px;color:#163f78">Tu firma</p>'
+    +'<div id="client-sig-area">'+clientSigHtml+'</div>'
+    +'</div></details>';
+
   var photosHtml=(mirror.photos||[]).length ? '<div class="photo-grid">'+mirror.photos.map(function(ph,i){
     return '<img data-name="'+escHtml(ph.name||('Foto '+(i+1)))+'" data-path="'+escHtml(ph.storagePath||'')+'" alt="'+escHtml(ph.name||'')+'">';
   }).join('')+'</div>' : '';
@@ -469,6 +535,7 @@ function renderDash(mirror){
   document.getElementById('view-dash').innerHTML =
     budgetTotalHtml
     +progressHtml
+    +signatureHtml
     +'<div class="card"><div class="ct">Avances del proyecto</div>'+avancesHtml+'</div>'
     +'<div class="card"><div class="ct">'+escHtml(mirror.title||'Proyecto')+'</div>'
     +'<div class="row"><span>Titular</span><span>'+escHtml(mirror.client)+'</span></div>'
@@ -497,6 +564,45 @@ function renderDash(mirror){
     if(path) firebase.storage().ref(path).getDownloadURL().then(function(url){img.src=url;}).catch(function(){});
     img.onclick=function(){ if(path) openViewer(img.dataset.name,path,false); };
   });
+
+  clientSigPendingUpload=null; clientSigHasDrawn=false;
+  if(showSigPad) initSignaturePad('client-sig-canvas');
+  var sigEdit=document.getElementById('client-sig-edit');
+  if(sigEdit) sigEdit.onclick=function(){ clientSigEditing=true; renderDash(mirror, clientSignature); };
+  var sigCancel=document.getElementById('client-sig-cancel');
+  if(sigCancel) sigCancel.onclick=function(){ clientSigEditing=false; renderDash(mirror, clientSignature); };
+  var sigClear=document.getElementById('client-sig-clear');
+  if(sigClear) sigClear.onclick=function(){
+    clientSigPendingUpload=null; clientSigHasDrawn=false;
+    var canvas=document.getElementById('client-sig-canvas');
+    if(canvas) canvas.getContext('2d').clearRect(0,0,canvas.width,canvas.height);
+    var prev=document.getElementById('client-sig-preview'); if(prev) prev.innerHTML='';
+  };
+  var sigFile=document.getElementById('client-sig-file');
+  if(sigFile) sigFile.addEventListener('change', async function(){
+    var file=sigFile.files[0];
+    if(!file) return;
+    var msg=document.getElementById('client-sig-msg'); msg.textContent='';
+    try{
+      clientSigPendingUpload=await fileToPngDataUrl(file);
+      var prev=document.getElementById('client-sig-preview');
+      if(prev) prev.innerHTML='<img src="'+clientSigPendingUpload+'" alt="Vista previa" style="max-width:220px;border:1px solid rgba(0,0,0,.1);border-radius:8px;background:#fff">';
+    }catch(e){ msg.textContent=(e&&e.message)||String(e); }
+  });
+  var sigSave=document.getElementById('client-sig-save');
+  if(sigSave) sigSave.onclick=async function(){
+    var msg=document.getElementById('client-sig-msg'); msg.textContent='';
+    var canvas=document.getElementById('client-sig-canvas');
+    if(!clientSigPendingUpload && !clientSigHasDrawn){ msg.textContent='Dibuja tu firma o adjunta una imagen antes de guardar.'; return; }
+    var dataUrl=clientSigPendingUpload || canvas.toDataURL('image/png');
+    sigSave.disabled=true;
+    try{
+      await db.collection('clientAccounts').doc(auth.currentUser.uid).update({signature:dataUrl, signedAt:Date.now()});
+      clientSigEditing=false;
+      renderDash(mirror, dataUrl);
+    }catch(e){ msg.textContent='No se pudo guardar: '+((e&&e.message)||String(e)); sigSave.disabled=false; }
+  };
+
   showView('view-dash');
 }
 
@@ -510,7 +616,7 @@ auth.onAuthStateChanged(async function(user){
     if(acc.status!=='approved'){ showView('view-rejected'); return; }
     var mirrorDoc=await db.collection('clientView').doc(acc.projectId).get();
     if(!mirrorDoc.exists || !mirrorDoc.data().clientApproved){ showView('view-pending'); return; }
-    renderDash(mirrorDoc.data());
+    renderDash(mirrorDoc.data(), acc.signature||'');
   }catch(e){
     if(e&&e.code==='permission-denied'){
       /* El acceso a este proyecto fue revocado, o todavia no esta aprobado. */

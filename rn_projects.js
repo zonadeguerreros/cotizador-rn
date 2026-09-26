@@ -3,6 +3,7 @@
   'use strict';
   const root = document.getElementById('tab-proyectos');
   let data = null, timer, queue = Promise.resolve(), ready = false, busy = false, pendingAvanceFiles = [];
+  let ownerSigEditing = false, ownerSigPendingUpload = null, ownerSigHasDrawn = false;
   const escape = escHtml;
   const clone = value => JSON.parse(JSON.stringify(value));
   const uid = () => 'PR-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
@@ -68,6 +69,7 @@
         attachments: (av.attachments || []).map(a => ({name: a.name, type: a.type, storagePath: a.storagePath || null}))
       })),
       tableroDone: !!p.tableroDone, planoDone: !!p.planoDone,
+      ownerSignature: p.ownerSignature || '',
       updatedAt: Date.now()
     };
   }
@@ -182,7 +184,7 @@
 
   function blank() {
     const now = new Date();
-    return {id: uid(), number: 'RN-P-' + now.getFullYear() + p2(now.getMonth() + 1) + p2(now.getDate()) + '-' + now.getTime().toString().slice(-5), title: '', client: '', location: '', author: 'Cristhian Sandoval - Cristopher Solis', date: now.getFullYear() + '-' + p2(now.getMonth() + 1) + '-' + p2(now.getDate()), intro: '', diagnosis: '', corrections: '', references: '', scope: 'El presupuesto considera la ejecución de los trabajos detallados, incluyendo mano de obra y servicios técnicos. Los materiales nuevos se cotizarán por separado, previa confirmación de cantidades y aprobación del cliente.', conditions: 'Programación, plazo de ejecución y forma de pago: por acordar por escrito antes del inicio de los trabajos.', approval: 'Con su firma, el cliente acepta los trabajos, alcances, valores y condiciones indicados en este documento. Cualquier modificación o trabajo adicional deberá ser informado y aprobado por escrito antes de su ejecución.', representative: 'Cristhian Sandoval Parra', items: [], photos: [], avances: [], tableroDone: false, planoDone: false, updatedAt: 0};
+    return {id: uid(), number: 'RN-P-' + now.getFullYear() + p2(now.getMonth() + 1) + p2(now.getDate()) + '-' + now.getTime().toString().slice(-5), title: '', client: '', location: '', author: 'Cristhian Sandoval - Cristopher Solis', date: now.getFullYear() + '-' + p2(now.getMonth() + 1) + '-' + p2(now.getDate()), intro: '', diagnosis: '', corrections: '', references: '', scope: 'El presupuesto considera la ejecución de los trabajos detallados, incluyendo mano de obra y servicios técnicos. Los materiales nuevos se cotizarán por separado, previa confirmación de cantidades y aprobación del cliente.', conditions: 'Programación, plazo de ejecución y forma de pago: por acordar por escrito antes del inicio de los trabajos.', approval: 'Con su firma, el cliente acepta los trabajos, alcances, valores y condiciones indicados en este documento. Cualquier modificación o trabajo adicional deberá ser informado y aprobado por escrito antes de su ejecución.', representative: 'Cristhian Sandoval Parra', items: [], photos: [], avances: [], tableroDone: false, planoDone: false, ownerSignature: '', updatedAt: 0};
   }
   function status(message, error) {
     const el = document.getElementById('pr-status');
@@ -319,8 +321,12 @@
       const mirror = mirrorDoc.exists ? mirrorDoc.data() : null;
       if (mirror && mirror.clientUid && mirror.clientApproved) {
         const accDoc = await firebase.firestore().collection('clientAccounts').doc(mirror.clientUid).get();
-        const email = accDoc.exists ? accDoc.data().email : '(cuenta no encontrada)';
-        box.innerHTML = `<p>Cliente con acceso a este proyecto: <strong>${escape(email)}</strong></p><button class="btn br sm" data-action="revoke-client">Revocar acceso</button>`;
+        const acc = accDoc.exists ? accDoc.data() : null;
+        const email = acc ? acc.email : '(cuenta no encontrada)';
+        const clientSigHtml = acc && acc.signature
+          ? `<p style="margin-top:10px;font-weight:700">Firma del cliente:</p><img src="${acc.signature}" alt="Firma del cliente" style="max-width:260px;border:1px solid var(--bd);border-radius:8px;background:#fff">`
+          : `<p style="margin-top:10px;color:var(--mut)">El cliente aún no ha firmado.</p>`;
+        box.innerHTML = `<p>Cliente con acceso a este proyecto: <strong>${escape(email)}</strong></p>${clientSigHtml}<button class="btn br sm" data-action="revoke-client" style="margin-top:10px">Revocar acceso</button>`;
         return;
       }
       const pending = await firebase.firestore().collection('clientAccounts').where('projectNumber', '==', projectNumber).where('status', '==', 'pending').get();
@@ -345,9 +351,10 @@
     <div class="card"><div class="ct">Avances del proyecto</div><p style="margin-bottom:12px;color:var(--mut)">Registra aquí las novedades y el avance del trabajo a medida que ocurren. Si le das acceso al cliente de este proyecto, esto es lo que él va a poder ver y descargar.</p><div id="av-list" style="margin-bottom:14px"></div><div class="card" style="background:rgba(0,0,0,.03)"><label class="L" for="av-note">Nueva nota de avance</label><textarea id="av-note" rows="3" placeholder="Ej: Se realizó el levantamiento inicial del tablero..."></textarea><label class="L" style="margin-top:10px" for="av-amount">Monto adicional (opcional, si este avance incluye un anexo/presupuesto extra)</label><input id="av-amount" type="number" min="0" max="999999999999" step="1" placeholder="Ej: 108000"><label class="L" style="margin-top:10px" for="av-file">Adjuntar fotos o PDF (opcional)</label><input id="av-file" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" multiple><div id="av-pending" style="margin-top:8px;color:var(--mut);font-size:12px"></div><button class="btn bg sm" data-action="add-avance" style="margin-top:12px">+ Agregar avance</button></div></div>
     <div class="card"><div class="ct">Presupuesto detallado · Solo trabajo</div>${field('scope', 'Alcance incluido', true)}<div style="overflow-x:auto;margin-top:16px"><table class="pr-table"><thead><tr><th>Ítem</th><th>Trabajo</th><th>Alcance incluido</th><th>Valor neto CLP</th><th></th></tr></thead><tbody id="pr-rows"></tbody></table></div><button class="btn bb sm" data-action="add-row" style="margin-top:12px">+ Agregar trabajo</button><div class="card-hi" style="max-width:480px;margin:18px 0 0 auto"><div class="row"><span>Total neto de los servicios</span><strong id="pr-net"></strong></div><div class="row"><span>IVA 19%</span><strong id="pr-tax"></strong></div><div class="row"><strong>Total del servicio con IVA</strong><strong id="pr-total"></strong></div><p style="margin-top:10px;color:var(--mut)">Materiales no incluidos. Cada valor corresponde al total neto del trabajo de esa fila.</p></div></div>
     <div class="card"><div class="ct">Condiciones y aprobación</div><div class="pr-sections">${field('conditions', 'Condiciones de ejecución, pago, plazo y garantía', true)}${field('approval', 'Texto de aprobación del presupuesto', true)}${field('representative', 'Representante R & N para la firma')}</div></div>
+    <div class="card"><div class="ct">Firma digital · R & N</div><p style="margin-bottom:12px;color:var(--mut)">Dibuja tu firma o adjunta una imagen. Esta firma queda guardada en el proyecto y el cliente la puede ver (sin poder editarla).</p><div id="owner-sig-view"></div></div>
     <div class="card"><div class="ct">Acceso del cliente</div><div id="client-access-box"><p style="color:var(--mut)">Cargando…</p></div></div>
     <div class="card"><div class="ct">Proyectos guardados</div><div id="pr-history"></div></div>`;
-    renderRows(); renderPhotos(); renderAvances(); renderHistory();
+    renderRows(); renderPhotos(); renderAvances(); renderHistory(); renderOwnerSignature();
     try { renderClientAccess(); } catch (e) { console.warn('Acceso de cliente no disponible:', e); }
   };
   root.addEventListener('input', event => {
@@ -477,6 +484,22 @@
         await syncDraftToSavedProject();
         if (av) (av.attachments || []).forEach(a => { if (a.storagePath) deleteStoragePhoto(a.storagePath); });
       }
+      if (action === 'edit-owner-sig') { ownerSigEditing = true; renderOwnerSignature(); }
+      if (action === 'cancel-owner-sig') { ownerSigEditing = false; renderOwnerSignature(); }
+      if (action === 'clear-owner-sig') {
+        ownerSigPendingUpload = null; ownerSigHasDrawn = false;
+        const canvas = document.getElementById('owner-sig-canvas');
+        if (canvas) canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
+        const prev = document.getElementById('owner-sig-preview'); if (prev) prev.innerHTML = '';
+      }
+      if (action === 'save-owner-sig') {
+        const canvas = document.getElementById('owner-sig-canvas');
+        if (!ownerSigPendingUpload && !ownerSigHasDrawn) { alert('Dibuja tu firma o adjunta una imagen antes de guardar.'); return; }
+        data.draft.ownerSignature = ownerSigPendingUpload || canvas.toDataURL('image/png');
+        ownerSigEditing = false;
+        renderOwnerSignature(); changed();
+        await syncDraftToSavedProject();
+      }
       if (action === 'ver-avance-adj') {
         const av = data.draft.avances[Number(button.dataset.av)];
         const att = av && av.attachments[Number(button.dataset.att)];
@@ -562,6 +585,59 @@
       return canvas.toDataURL('image/jpeg', .84);
     } finally { URL.revokeObjectURL(url); }
   }
+  /* Firma digital: se puede dibujar a mano (mouse o dedo) o adjuntar una
+     imagen; en ambos casos queda guardada como PNG en base64. */
+  function initSignaturePad(canvasId) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    ctx.strokeStyle = '#111'; ctx.lineWidth = 2.4; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    let drawing = false, last = null;
+    const pos = e => {
+      const r = canvas.getBoundingClientRect();
+      const t = e.touches && e.touches[0];
+      const cx = (t ? t.clientX : e.clientX) - r.left, cy = (t ? t.clientY : e.clientY) - r.top;
+      return {x: cx * (canvas.width / r.width), y: cy * (canvas.height / r.height)};
+    };
+    const start = e => { drawing = true; last = pos(e); e.preventDefault(); };
+    const move = e => {
+      if (!drawing) return;
+      const p = pos(e);
+      ctx.beginPath(); ctx.moveTo(last.x, last.y); ctx.lineTo(p.x, p.y); ctx.stroke();
+      last = p; ownerSigHasDrawn = true; e.preventDefault();
+    };
+    const end = () => { drawing = false; };
+    canvas.addEventListener('mousedown', start);
+    canvas.addEventListener('mousemove', move);
+    window.addEventListener('mouseup', end);
+    canvas.addEventListener('touchstart', start, {passive: false});
+    canvas.addEventListener('touchmove', move, {passive: false});
+    canvas.addEventListener('touchend', end);
+  }
+  async function fileToPngDataUrl(file) {
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) throw new Error('Usa una imagen JPG, PNG o WebP.');
+    if (file.size > 3 * 1024 * 1024) throw new Error('La imagen es demasiado grande (máx. 3 MB).');
+    const image = new Image(), url = URL.createObjectURL(file);
+    try {
+      await new Promise((resolve, reject) => { image.onload = resolve; image.onerror = () => reject(new Error('No se pudo leer la imagen.')); image.src = url; });
+      const scale = Math.min(1, 500 / Math.max(image.naturalWidth, image.naturalHeight));
+      const canvas = document.createElement('canvas'); canvas.width = Math.round(image.naturalWidth * scale); canvas.height = Math.round(image.naturalHeight * scale);
+      const ctx = canvas.getContext('2d'); ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+      return canvas.toDataURL('image/png');
+    } finally { URL.revokeObjectURL(url); }
+  }
+  function renderOwnerSignature() {
+    const el = document.getElementById('owner-sig-view');
+    if (!el) return;
+    const saved = data.draft.ownerSignature;
+    if (saved && !ownerSigEditing) {
+      el.innerHTML = `<img src="${saved}" alt="Firma de R & N" style="max-width:320px;display:block;margin-bottom:10px;border:1px solid var(--bd);border-radius:8px;background:#fff"><button class="btn bh sm" data-action="edit-owner-sig">Cambiar firma</button>`;
+      return;
+    }
+    ownerSigPendingUpload = null; ownerSigHasDrawn = false;
+    el.innerHTML = `<canvas id="owner-sig-canvas" width="400" height="150" style="border:1px solid var(--bd);border-radius:8px;background:#fff;touch-action:none;cursor:crosshair;display:block;max-width:100%"></canvas><div id="owner-sig-preview" style="margin-top:8px"></div><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"><button class="btn bh sm" data-action="clear-owner-sig">Limpiar</button><label class="btn bh sm" for="owner-sig-file" style="cursor:pointer">Adjuntar imagen<input id="owner-sig-file" type="file" accept="image/jpeg,image/png,image/webp" hidden></label><button class="btn bg sm" data-action="save-owner-sig">Guardar firma</button>${saved ? '<button class="btn bh sm" data-action="cancel-owner-sig">Cancelar</button>' : ''}</div>`;
+    initSignaturePad('owner-sig-canvas');
+  }
   async function avanceFileData(file) {
     if (file.type === 'application/pdf') {
       if (file.size > 20 * 1024 * 1024) throw new Error('El PDF supera 20 MB: ' + file.name);
@@ -585,7 +661,7 @@
       if (row) { row[event.target.dataset.stage] = event.target.checked; renderProgress(); changed(); await syncDraftToSavedProject(); }
       return;
     }
-    if (!['pr-file', 'pr-import', 'av-file'].includes(event.target.id)) return;
+    if (!['pr-file', 'pr-import', 'av-file', 'owner-sig-file'].includes(event.target.id)) return;
     if (busy) { event.target.value = ''; return; }
     busy = true;
     try {
@@ -596,6 +672,13 @@
         const additions = [];
         for (const file of files) additions.push({data: await photoData(file), name: file.name.replace(/\.[^.]+$/, ''), caption: ''});
         data.draft.photos.push(...additions); renderPhotos(); await persist();
+      } else if (event.target.id === 'owner-sig-file') {
+        const file = event.target.files[0];
+        if (file) {
+          ownerSigPendingUpload = await fileToPngDataUrl(file);
+          const prev = document.getElementById('owner-sig-preview');
+          if (prev) prev.innerHTML = `<img src="${ownerSigPendingUpload}" alt="Vista previa" style="max-width:260px;border:1px solid var(--bd);border-radius:8px;background:#fff">`;
+        }
       } else if (event.target.id === 'av-file') {
         const files = Array.from(event.target.files);
         if (pendingAvanceFiles.length + files.length > 20) throw new Error('Máximo 20 adjuntos por avance.');
