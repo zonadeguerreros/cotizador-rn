@@ -54,7 +54,8 @@ th{color:#64748b;font-weight:700;font-size:11px;text-transform:uppercase}
 .acc.avance-item summary{background:#fff;font-weight:600;font-size:13px;padding:11px 14px}
 .acc.avance-item .acc-body{padding:0 14px 14px}
 .acc.avance-item .acc-body p{white-space:pre-wrap;font-size:14px;margin:0 0 8px}
-.att{display:inline-block;background:#eef2f7;border-radius:7px;padding:5px 10px;font-size:12px;margin:4px 6px 0 0;cursor:pointer}.att-thumb{width:72px;height:72px;object-fit:cover;border-radius:8px;cursor:pointer;border:1px solid rgba(0,0,0,.1);margin:4px 6px 0 0;background:#eef2f7;vertical-align:top}
+.att{display:inline-block;background:#eef2f7;border-radius:7px;padding:5px 10px;font-size:12px;margin:4px 6px 0 0;cursor:pointer}
+.att-thumb{width:72px;height:72px;object-fit:cover;border-radius:8px;cursor:pointer;border:1px solid rgba(0,0,0,.1);margin:4px 6px 0 0;background:#eef2f7;vertical-align:top}
 #logout{background:transparent;border:1px solid rgba(255,255,255,.35);color:#fff;font-size:12px;padding:7px 12px}
 #viewer-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:9999;padding:18px;box-sizing:border-box}
 #viewer-box{background:#fff;border-radius:10px;max-width:1000px;height:100%;margin:0 auto;display:flex;flex-direction:column;overflow:hidden}
@@ -65,21 +66,38 @@ th{color:#64748b;font-weight:700;font-size:11px;text-transform:uppercase}
 <body>
 <header>
   <div><h1>Portal Cliente &middot; R &amp; N Electricidad y Electr&oacute;nica</h1><p>Seguimiento de tu proyecto</p></div>
-  <button id="logout" class="hidden">Cerrar sesi&oacute;n</button>
+  <div style="display:flex;gap:8px">
+    <button id="account-btn" class="hidden" style="background:transparent;border:1px solid rgba(255,255,255,.35);color:#fff;font-size:12px;padding:7px 12px;border-radius:8px;cursor:pointer">Mi cuenta</button>
+    <button id="logout" class="hidden">Cerrar sesi&oacute;n</button>
+  </div>
 </header>
 <main>
 
 <div id="view-login" class="card">
   <div class="ct">Iniciar sesi&oacute;n</div>
   <form id="form-login" autocomplete="on">
-    <label class="L" for="li-user">Usuario</label>
+    <label class="L" for="li-user">Usuario o correo electr&oacute;nico</label>
     <input type="text" id="li-user" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false">
     <label class="L" for="li-pass">Clave</label>
     <input type="password" id="li-pass" autocomplete="current-password">
     <button type="submit" class="btn-p" id="li-go">Entrar</button>
     <div id="msg"></div>
   </form>
+  <button type="button" class="btn-s" id="show-forgot">&iquest;Olvidaste tu clave?</button>
   <button type="button" class="btn-s" id="show-signup">¿No tienes cuenta? Crear cuenta de cliente</button>
+</div>
+
+<div id="view-forgot" class="card hidden">
+  <div class="ct">Recuperar clave</div>
+  <p style="color:#64748b;font-size:13px;margin-bottom:14px">Escribe el correo electr&oacute;nico con el que creaste tu cuenta. Te enviaremos un enlace para elegir una clave nueva.</p>
+  <form id="form-forgot" autocomplete="on">
+    <label class="L" for="fg-email">Correo electr&oacute;nico</label>
+    <input type="email" id="fg-email" autocomplete="email" autocapitalize="none" autocorrect="off" spellcheck="false">
+    <button type="submit" class="btn-p" id="fg-go">Enviar enlace</button>
+    <div id="msg3"></div>
+  </form>
+  <p style="color:#64748b;font-size:12px;margin-top:10px">¿Tu cuenta es antigua y no tiene correo registrado? Contacta directamente a R &amp; N para recuperar el acceso.</p>
+  <button type="button" class="btn-s" id="back-forgot">Volver a iniciar sesi&oacute;n</button>
 </div>
 
 <div id="view-signup" class="card hidden">
@@ -90,8 +108,8 @@ th{color:#64748b;font-weight:700;font-size:11px;text-transform:uppercase}
     <input type="text" id="su-name" autocomplete="name">
     <label class="L" for="su-proj">N&uacute;mero de proyecto</label>
     <input type="text" id="su-proj" autocapitalize="off" autocorrect="off" spellcheck="false">
-    <label class="L" for="su-user">Elige un usuario</label>
-    <input type="text" id="su-user" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false">
+    <label class="L" for="su-email">Correo electr&oacute;nico</label>
+    <input type="email" id="su-email" autocomplete="email" autocapitalize="none" autocorrect="off" spellcheck="false">
     <label class="L" for="su-pass">Elige una clave</label>
     <input type="password" id="su-pass" autocomplete="new-password">
     <button type="submit" class="btn-p" id="su-go">Solicitar cuenta</button>
@@ -112,6 +130,22 @@ th{color:#64748b;font-weight:700;font-size:11px;text-transform:uppercase}
 </div>
 
 <div id="view-dash" class="hidden"></div>
+
+<div id="view-account" class="card hidden">
+  <div class="ct">Mi cuenta</div>
+  <p style="color:#64748b;font-size:13px;margin-bottom:14px">Correo actual: <strong id="acc-current-email"></strong></p>
+  <form id="form-account" autocomplete="on">
+    <label class="L" for="acc-curpass">Clave actual</label>
+    <input type="password" id="acc-curpass" autocomplete="current-password">
+    <label class="L" for="acc-newpass">Nueva clave (d&eacute;jalo en blanco para no cambiarla)</label>
+    <input type="password" id="acc-newpass" autocomplete="new-password">
+    <label class="L" for="acc-newemail">Correo de recuperaci&oacute;n (d&eacute;jalo en blanco para no cambiarlo)</label>
+    <input type="email" id="acc-newemail" autocomplete="email" autocapitalize="none" autocorrect="off" spellcheck="false">
+    <button type="submit" class="btn-p" id="acc-go">Guardar cambios</button>
+    <div id="msg4"></div>
+  </form>
+  <button type="button" class="btn-s" id="acc-back">Volver</button>
+</div>
 
 </main>
 
@@ -151,15 +185,40 @@ var authReady=auth.setPersistence(firebase.auth.Auth.Persistence.SESSION).catch(
 var EMAIL_DOMAIN='@cliente.cotizador-rn.local';
 function escHtml(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
 function toEmail(username){return String(username||'').trim().toLowerCase().replace(/[^a-z0-9._-]/g,'')+EMAIL_DOMAIN;}
+/* Cuentas antiguas se crearon con un usuario (sin @) que internamente se
+   guarda como un correo sintetico no real; cuentas nuevas se crean
+   directamente con el correo real del cliente, asi Firebase puede enviarle
+   un enlace para recuperar su clave. Este resolver deja entrar con
+   cualquiera de las dos formas sin romper las cuentas ya creadas. */
+function resolveLoginEmail(input){
+  input=String(input||'').trim().toLowerCase();
+  return input.indexOf('@')>-1 ? input : toEmail(input);
+}
 function showView(id){
-  ['view-login','view-signup','view-pending','view-rejected','view-dash'].forEach(function(v){
+  ['view-login','view-signup','view-forgot','view-pending','view-rejected','view-dash','view-account'].forEach(function(v){
     document.getElementById(v).classList.toggle('hidden', v!==id);
   });
-  document.getElementById('logout').classList.toggle('hidden', id==='view-login'||id==='view-signup');
+  var authed = id==='view-dash'||id==='view-account';
+  document.getElementById('logout').classList.toggle('hidden', !authed);
+  document.getElementById('account-btn').classList.toggle('hidden', !authed);
 }
 document.getElementById('show-signup').onclick=function(){showView('view-signup');};
 document.getElementById('show-login').onclick=function(){showView('view-login');};
+document.getElementById('show-forgot').onclick=function(){
+  document.getElementById('fg-email').value='';
+  document.getElementById('msg3').textContent='';
+  document.getElementById('msg3').style.color='#b91c1c';
+  showView('view-forgot');
+};
+document.getElementById('back-forgot').onclick=function(){showView('view-login');};
 document.getElementById('logout').onclick=function(){auth.signOut();showView('view-login');};
+document.getElementById('account-btn').onclick=function(){
+  document.getElementById('acc-current-email').textContent=(auth.currentUser&&auth.currentUser.email)||'';
+  document.getElementById('form-account').reset();
+  document.getElementById('msg4').textContent='';
+  showView('view-account');
+};
+document.getElementById('acc-back').onclick=function(){showView('view-dash');};
 
 /* === Visor de archivos (fotos y PDF de avances) === */
 function ensureViewer(){return document.getElementById('viewer-overlay');}
@@ -207,22 +266,23 @@ document.getElementById('form-signup').addEventListener('submit',async function(
   msg.textContent='';
   var name=document.getElementById('su-name').value.trim();
   var projectNumber=document.getElementById('su-proj').value.trim();
-  var username=document.getElementById('su-user').value.trim();
+  var email=document.getElementById('su-email').value.trim().toLowerCase();
   var pass=document.getElementById('su-pass').value;
-  if(!name||!projectNumber||!username||!pass){msg.textContent='Completa todos los campos.';return;}
+  if(!name||!projectNumber||!email||!pass){msg.textContent='Completa todos los campos.';return;}
+  if(email.indexOf('@')<0){msg.textContent='Escribe un correo electrónico válido.';return;}
   if(pass.length<6){msg.textContent='La clave debe tener al menos 6 caracteres.';return;}
   go.disabled=true;
   try{
     await authReady;
-    var cred=await auth.createUserWithEmailAndPassword(toEmail(username),pass);
+    var cred=await auth.createUserWithEmailAndPassword(email,pass);
     await db.collection('clientAccounts').doc(cred.user.uid).set({
-      email:toEmail(username), displayName:name, projectNumber:projectNumber,
+      email:email, displayName:name, projectNumber:projectNumber,
       status:'pending', requestedAt:Date.now()
     });
     showView('view-pending');
   }catch(e){
     var code=e&&e.code;
-    if(code==='auth/email-already-in-use')msg.textContent='Ese usuario ya está en uso, elige otro.';
+    if(code==='auth/email-already-in-use')msg.textContent='Ese correo ya está en uso, usa otro o recupera tu clave.';
     else if(code==='auth/weak-password')msg.textContent='La clave es muy débil.';
     else if(code==='auth/network-request-failed')msg.textContent='Sin conexión a internet. Revisa tu conexión (datos móviles o Wi-Fi) e intenta de nuevo.';
     else msg.textContent='No se pudo crear la cuenta: '+((e&&e.message)||e);
@@ -241,7 +301,7 @@ document.getElementById('form-login').addEventListener('submit',async function(e
   go.disabled=true;
   try{
     await authReady;
-    await auth.signInWithEmailAndPassword(toEmail(username),pass);
+    await auth.signInWithEmailAndPassword(resolveLoginEmail(username),pass);
   }catch(e){
     var code=e&&e.code;
     if(code==='auth/network-request-failed')msg.textContent='Sin conexión a internet. Revisa tu conexión (datos móviles o Wi-Fi) e intenta de nuevo.';
@@ -253,19 +313,86 @@ document.getElementById('form-login').addEventListener('submit',async function(e
   go.disabled=false;
 });
 
+/* === Recuperar clave === */
+document.getElementById('form-forgot').addEventListener('submit',async function(ev){
+  ev.preventDefault();
+  var msg=document.getElementById('msg3'), go=document.getElementById('fg-go');
+  var email=document.getElementById('fg-email').value.trim().toLowerCase();
+  if(!email||email.indexOf('@')<0){msg.style.color='#b91c1c';msg.textContent='Escribe un correo electrónico válido.';return;}
+  go.disabled=true;
+  try{
+    await authReady;
+    await auth.sendPasswordResetEmail(email);
+  }catch(e){
+    /* No revelar si el correo existe o no (evita que alguien adivine cuentas). */
+  }
+  msg.style.color='#166534';
+  msg.textContent='Si ese correo está registrado, te enviamos un enlace para elegir una clave nueva. Revisa también la carpeta de spam.';
+  go.disabled=false;
+});
+
+/* === Mi cuenta: cambiar clave y/o agregar correo de recuperación === */
+document.getElementById('form-account').addEventListener('submit',async function(ev){
+  ev.preventDefault();
+  var msg=document.getElementById('msg4'), go=document.getElementById('acc-go');
+  msg.style.color='#b91c1c'; msg.textContent='';
+  var curPass=document.getElementById('acc-curpass').value;
+  var newPass=document.getElementById('acc-newpass').value;
+  var newEmail=document.getElementById('acc-newemail').value.trim().toLowerCase();
+  var user=auth.currentUser;
+  if(!user){msg.textContent='Tu sesión expiró, vuelve a iniciar sesión.';return;}
+  if(!curPass){msg.textContent='Escribe tu clave actual para confirmar los cambios.';return;}
+  if(!newPass&&!newEmail){msg.textContent='No hay cambios para guardar.';return;}
+  if(newPass&&newPass.length<6){msg.textContent='La nueva clave debe tener al menos 6 caracteres.';return;}
+  if(newEmail&&newEmail.indexOf('@')<0){msg.textContent='Escribe un correo electrónico válido.';return;}
+  go.disabled=true;
+  try{
+    var credential=firebase.auth.EmailAuthProvider.credential(user.email,curPass);
+    await user.reauthenticateWithCredential(credential);
+    if(newPass) await user.updatePassword(newPass);
+    var emailChanged=false;
+    if(newEmail && newEmail!==user.email){
+      await user.updateEmail(newEmail);
+      emailChanged=true;
+      try{ await db.collection('clientAccounts').doc(user.uid).update({email:newEmail}); }catch(e2){}
+    }
+    msg.style.color='#166534';
+    msg.textContent='Listo, tus cambios se guardaron.'+(emailChanged?' Desde ahora inicia sesión con tu nuevo correo: '+newEmail:'');
+    document.getElementById('acc-current-email').textContent=user.email;
+    document.getElementById('form-account').reset();
+  }catch(e){
+    var code=e&&e.code;
+    if(code==='auth/wrong-password'||code==='auth/invalid-credential')msg.textContent='Tu clave actual no es correcta.';
+    else if(code==='auth/email-already-in-use')msg.textContent='Ese correo ya está en uso por otra cuenta.';
+    else if(code==='auth/requires-recent-login')msg.textContent='Por seguridad, cierra sesión y vuelve a entrar antes de cambiar esto.';
+    else if(code==='auth/network-request-failed')msg.textContent='Sin conexión a internet.';
+    else msg.textContent='No se pudo guardar: '+((e&&e.message)||e);
+  }
+  go.disabled=false;
+});
+
 /* === Panel del cliente === */
 function fmCLP(n){return new Intl.NumberFormat('es-CL',{style:'currency',currency:'CLP',maximumFractionDigits:0}).format(n||0);}
 function renderDash(mirror){
   var net=(mirror.items||[]).reduce(function(a,it){return a+(it.price||0);},0);
-  var avanceExtras=(mirror.avances||[]).filter(function(av){return av.amount;}); var extraRowsHtml=avanceExtras.map(function(av,i){return '<tr><td>'+((mirror.items||[]).length+i+1)+'</td><td>Avance '+escHtml(av.date)+(av.note?' — '+escHtml(av.note.slice(0,60)):'')+'</td><td>Ver avance del '+escHtml(av.date)+'</td><td>'+fmCLP(av.amount)+'</td></tr>';}).join(''); net+=avanceExtras.reduce(function(a,av){return a+(av.amount||0);},0); var iva=Math.round(net*0.19), total=net+iva;
   var rowsHtml=(mirror.items||[]).map(function(it,i){
     var origin=it.origin?'<div style="font-size:11px;color:#64748b;margin-top:2px">Ref.: '+escHtml(it.origin)+'</div>':'';
     return '<tr><td>'+(i+1)+'</td><td>'+escHtml(it.name)+origin+'</td><td>'+escHtml(it.scope)+'</td><td>'+fmCLP(it.price)+'</td></tr>';
   }).join('');
+  /* Los avances pueden traer un "monto adicional" opcional (p.ej. un anexo
+     tecnico cotizado aparte); eso tambien se suma al presupuesto total y se
+     lista como una fila mas, referenciando el avance de donde salio. */
+  var avanceExtras=(mirror.avances||[]).filter(function(av){return av.amount;});
+  var extraRowsHtml=avanceExtras.map(function(av,i){
+    return '<tr><td>'+((mirror.items||[]).length+i+1)+'</td><td>Avance '+escHtml(av.date)+(av.note?' — '+escHtml(av.note.slice(0,60)):'')+'</td><td>Ver avance del '+escHtml(av.date)+'</td><td>'+fmCLP(av.amount)+'</td></tr>';
+  }).join('');
+  net+=avanceExtras.reduce(function(a,av){return a+(av.amount||0);},0);
+  var iva=Math.round(net*0.19), total=net+iva;
   /* "Presupuesto total": mirror.items ya incluye tanto las partidas del
      informe original como cualquier ítem nuevo agregado despues (p.ej. un
-     anexo tecnico), asi que esta tabla siempre refleja el total combinado
-     y actualizado. */
+     anexo tecnico), y aqui se suman ademas los montos adicionales de
+     avances, asi que esta tabla siempre refleja el total combinado y
+     actualizado. */
   var budgetTotalHtml=
     '<details class="acc total"><summary><span>💰 Presupuesto total</span><span>'+fmCLP(total)+'</span></summary>'
     +'<div class="acc-body">'
@@ -290,9 +417,12 @@ function renderDash(mirror){
   var avancesList=(mirror.avances||[]).slice().reverse();
   var avancesHtml=avancesList.length ? avancesList.map(function(av){
     var atts=(av.attachments||[]).map(function(a){
-      if(a.type==='pdf') return '<span class="att" data-name="'+escHtml(a.name)+'" data-path="'+escHtml(a.storagePath||'')+'" data-type="pdf">📄 '+escHtml(a.name)+'</span>'; return '<img class="att-thumb" data-name="'+escHtml(a.name)+'" data-path="'+escHtml(a.storagePath||'')+'" data-type="image" alt="'+escHtml(a.name)+'" title="'+escHtml(a.name)+'">';
+      if(a.type==='pdf') return '<span class="att" data-name="'+escHtml(a.name)+'" data-path="'+escHtml(a.storagePath||'')+'" data-type="pdf">📄 '+escHtml(a.name)+'</span>';
+      return '<img class="att-thumb" data-name="'+escHtml(a.name)+'" data-path="'+escHtml(a.storagePath||'')+'" data-type="image" alt="'+escHtml(a.name)+'" title="'+escHtml(a.name)+'">';
     }).join('');
-    var amountBadge=av.amount?'<span style="font-weight:700">+'+fmCLP(av.amount)+'</span>':''; var amountLine=av.amount?'<p style="font-weight:700;color:#163f78">Monto adicional: '+fmCLP(av.amount)+'</p>':''; return '<details class="acc avance-item"><summary><span>'+escHtml(av.date)+'</span>'+amountBadge+'</summary><div class="acc-body"><p>'+escHtml(av.note)+'</p>'+amountLine+atts+'</div></details>';
+    var amountBadge=av.amount?'<span style="font-weight:700">+'+fmCLP(av.amount)+'</span>':'';
+    var amountLine=av.amount?'<p style="font-weight:700;color:#163f78">Monto adicional: '+fmCLP(av.amount)+'</p>':'';
+    return '<details class="acc avance-item"><summary><span>'+escHtml(av.date)+'</span>'+amountBadge+'</summary><div class="acc-body"><p>'+escHtml(av.note)+'</p>'+amountLine+atts+'</div></details>';
   }).join('') : '<p style="color:#64748b">Todavía no hay avances registrados.</p>';
 
   /* Lo mas nuevo va arriba: el presupuesto (resumen siempre vigente), luego
@@ -321,7 +451,12 @@ function renderDash(mirror){
     img.onclick=function(){ if(path) openViewer(img.dataset.name,path,false); };
   });
   document.querySelectorAll('.att').forEach(function(el){
-    el.onclick=function(){ if(el.dataset.path) openViewer(el.dataset.name,el.dataset.path,el.dataset.type==='pdf'); }; }); document.querySelectorAll('.att-thumb').forEach(function(img){ var path=img.dataset.path; if(path) firebase.storage().ref(path).getDownloadURL().then(function(url){img.src=url;}).catch(function(){}); img.onclick=function(){ if(path) openViewer(img.dataset.name,path,false); };
+    el.onclick=function(){ if(el.dataset.path) openViewer(el.dataset.name,el.dataset.path,el.dataset.type==='pdf'); };
+  });
+  document.querySelectorAll('.att-thumb').forEach(function(img){
+    var path=img.dataset.path;
+    if(path) firebase.storage().ref(path).getDownloadURL().then(function(url){img.src=url;}).catch(function(){});
+    img.onclick=function(){ if(path) openViewer(img.dataset.name,path,false); };
   });
   showView('view-dash');
 }
