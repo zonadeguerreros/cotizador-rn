@@ -3,7 +3,7 @@
   "short_name": "Portal R&N",
   "description": "Consulta el informe técnico y los avances de tu proyecto con R & N Electricidad y Electrónica.",
   "start_url": "./cliente.html",
-  "scope": "./",
+  "scope": "./cliente.html",
   "id": "/cotizador-rn/cliente",
   "display": "standalone",
   "orientation": "any",

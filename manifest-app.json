@@ -3,7 +3,7 @@
   "short_name": "Cotizador R&N",
   "description": "Cotizador de materiales, historial, proyectos y documentos de R & N Electricidad y Electrónica.",
   "start_url": "./index.html",
-  "scope": "./",
+  "scope": "./index.html",
   "id": "/cotizador-rn/app",
   "display": "standalone",
   "orientation": "any",
