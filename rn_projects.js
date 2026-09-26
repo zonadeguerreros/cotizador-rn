@@ -571,9 +571,9 @@
         renderHistory();
       }
       if (action === 'approve-client') {
-        const uid = button.dataset.uid;
-        await firebase.firestore().collection('clientAccounts').doc(uid).update({status: 'approved', projectId: data.draft.id, approvedAt: Date.now()});
-        await firebase.firestore().collection('clientView').doc(data.draft.id).set({clientUid: uid, clientApproved: true}, {merge: true});
+        const clientUid = button.dataset.uid;
+        await firebase.firestore().collection('clientAccounts').doc(clientUid).update({status: 'approved', projectId: data.draft.id, approvedAt: Date.now()});
+        await firebase.firestore().collection('clientView').doc(data.draft.id).set({clientUid: clientUid, clientApproved: true}, {merge: true});
         renderClientAccess();
       }
       if (action === 'reject-client') {
@@ -587,7 +587,13 @@
       if (action === 'backup') { if (root.querySelector('input:invalid')) { valid(); return; } editableFile(); }
       if (action === 'pdf' || action === 'budget') {
         if (!valid()) return;
-        busy = true; button.disabled = true; status('Generando PDF… Elige dónde guardarlo.');
+        busy = true; button.disabled = true; status('Sincronizando firma y aprobaciones del cliente…');
+        /* Espera a que la firma/aprobaciones mas recientes del cliente (que
+           solo viven de verdad en su cuenta de Firestore) se copien al
+           proyecto antes de generar el PDF, para no incluir una version
+           vieja si el dueño genera el PDF justo al abrir el proyecto. */
+        try { await renderClientAccess(); } catch (e) {}
+        status('Generando PDF… Elige dónde guardarlo.');
         const result = await window.pywebview.api.export_project_pdf(clone(data.draft), action === 'budget');
         if (!result.ok) throw new Error(result.error);
         status(result.cancelled ? 'Exportación cancelada.' : 'PDF guardado en: ' + result.path);
