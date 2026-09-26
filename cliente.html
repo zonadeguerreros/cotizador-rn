@@ -408,6 +408,44 @@ function renderDash(mirror){
     if(!text||!text.trim())return'';
     return '<details class="acc"><summary><span>'+escHtml(title)+'</span></summary><div class="acc-body"><p style="white-space:pre-wrap;font-size:14px;color:#334155">'+escHtml(text)+'</p></div></details>';
   }
+
+  /* Avance de instalación: tablero y plano/AutoCAD valen 15% cada uno; el
+     resto se reparte en partes iguales entre cada punto del presupuesto,
+     y cada punto se subdivide en canalizado (40%), cableado (40%) y en
+     funcionamiento (20%, la etapa mínima). Solo lectura para el cliente:
+     estos valores los marca R & N desde su panel. */
+  var PROGRESS_TABLERO_PCT=15, PROGRESS_PLANO_PCT=15;
+  function computeProgress(mirror){
+    var items=mirror.items||[];
+    var fixedPct=PROGRESS_TABLERO_PCT+PROGRESS_PLANO_PCT;
+    var perItemPct=items.length ? (100-fixedPct)/items.length : 0;
+    var pct=0;
+    if(mirror.tableroDone) pct+=PROGRESS_TABLERO_PCT;
+    if(mirror.planoDone) pct+=PROGRESS_PLANO_PCT;
+    items.forEach(function(it){
+      if(it.canalizado) pct+=perItemPct*0.4;
+      if(it.cableado) pct+=perItemPct*0.4;
+      if(it.funcionamiento) pct+=perItemPct*0.2;
+    });
+    return Math.round(pct);
+  }
+  var progressPct=computeProgress(mirror);
+  var progressItemsHtml=(mirror.items||[]).map(function(it){
+    var stages=[['canalizado','Canalizado'],['cableado','Cableado'],['funcionamiento','En funcionamiento']];
+    var stagesHtml=stages.map(function(s){
+      var done=!!it[s[0]];
+      return '<span style="display:inline-flex;align-items:center;gap:4px;margin-right:14px;font-size:12px;color:'+(done?'#166534':'#94a3b8')+'">'+(done?'✅':'⬜')+' '+s[1]+'</span>';
+    }).join('');
+    return '<div class="row" style="flex-direction:column;align-items:flex-start;gap:6px"><strong>'+escHtml(it.name)+'</strong><div>'+stagesHtml+'</div></div>';
+  }).join('');
+  var progressHtml=
+    '<details class="acc"><summary><span>📊 Avance de la instalación</span><span>'+progressPct+'%</span></summary>'
+    +'<div class="acc-body">'
+    +'<div style="background:#eef2f7;border-radius:999px;height:14px;overflow:hidden;margin-bottom:14px"><div style="background:#163f78;height:100%;width:'+progressPct+'%"></div></div>'
+    +'<div class="row"><span>Tablero eléctrico</span><span>'+(mirror.tableroDone?'✅ Listo':'⬜ Pendiente')+'</span></div>'
+    +'<div class="row"><span>Plano / AutoCAD</span><span>'+(mirror.planoDone?'✅ Listo':'⬜ Pendiente')+'</span></div>'
+    +(progressItemsHtml?'<div style="margin-top:10px">'+progressItemsHtml+'</div>':'')
+    +'</div></details>';
   var photosHtml=(mirror.photos||[]).length ? '<div class="photo-grid">'+mirror.photos.map(function(ph,i){
     return '<img data-name="'+escHtml(ph.name||('Foto '+(i+1)))+'" data-path="'+escHtml(ph.storagePath||'')+'" alt="'+escHtml(ph.name||'')+'">';
   }).join('')+'</div>' : '';
@@ -430,6 +468,7 @@ function renderDash(mirror){
      tecnico original, que es el contenido mas antiguo/estatico. */
   document.getElementById('view-dash').innerHTML =
     budgetTotalHtml
+    +progressHtml
     +'<div class="card"><div class="ct">Avances del proyecto</div>'+avancesHtml+'</div>'
     +'<div class="card"><div class="ct">'+escHtml(mirror.title||'Proyecto')+'</div>'
     +'<div class="row"><span>Titular</span><span>'+escHtml(mirror.client)+'</span></div>'

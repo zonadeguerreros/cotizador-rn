@@ -67,6 +67,7 @@
         id: av.id, date: av.date, note: av.note, amount: av.amount || 0,
         attachments: (av.attachments || []).map(a => ({name: a.name, type: a.type, storagePath: a.storagePath || null}))
       })),
+      tableroDone: !!p.tableroDone, planoDone: !!p.planoDone,
       updatedAt: Date.now()
     };
   }
@@ -181,7 +182,7 @@
 
   function blank() {
     const now = new Date();
-    return {id: uid(), number: 'RN-P-' + now.getFullYear() + p2(now.getMonth() + 1) + p2(now.getDate()) + '-' + now.getTime().toString().slice(-5), title: '', client: '', location: '', author: 'Cristhian Sandoval - Cristopher Solis', date: now.getFullYear() + '-' + p2(now.getMonth() + 1) + '-' + p2(now.getDate()), intro: '', diagnosis: '', corrections: '', references: '', scope: 'El presupuesto considera la ejecución de los trabajos detallados, incluyendo mano de obra y servicios técnicos. Los materiales nuevos se cotizarán por separado, previa confirmación de cantidades y aprobación del cliente.', conditions: 'Programación, plazo de ejecución y forma de pago: por acordar por escrito antes del inicio de los trabajos.', approval: 'Con su firma, el cliente acepta los trabajos, alcances, valores y condiciones indicados en este documento. Cualquier modificación o trabajo adicional deberá ser informado y aprobado por escrito antes de su ejecución.', representative: 'Cristhian Sandoval Parra', items: [], photos: [], avances: [], updatedAt: 0};
+    return {id: uid(), number: 'RN-P-' + now.getFullYear() + p2(now.getMonth() + 1) + p2(now.getDate()) + '-' + now.getTime().toString().slice(-5), title: '', client: '', location: '', author: 'Cristhian Sandoval - Cristopher Solis', date: now.getFullYear() + '-' + p2(now.getMonth() + 1) + '-' + p2(now.getDate()), intro: '', diagnosis: '', corrections: '', references: '', scope: 'El presupuesto considera la ejecución de los trabajos detallados, incluyendo mano de obra y servicios técnicos. Los materiales nuevos se cotizarán por separado, previa confirmación de cantidades y aprobación del cliente.', conditions: 'Programación, plazo de ejecución y forma de pago: por acordar por escrito antes del inicio de los trabajos.', approval: 'Con su firma, el cliente acepta los trabajos, alcances, valores y condiciones indicados en este documento. Cualquier modificación o trabajo adicional deberá ser informado y aprobado por escrito antes de su ejecución.', representative: 'Cristhian Sandoval Parra', items: [], photos: [], avances: [], tableroDone: false, planoDone: false, updatedAt: 0};
   }
   function status(message, error) {
     const el = document.getElementById('pr-status');
@@ -208,7 +209,18 @@
   function totals() {
     const net = data.draft.items.reduce((sum, row) => sum + row.price, 0);
     const tax = Number((BigInt(net) * 19n + 50n) / 100n);
-    return {net, tax, total: net + tax}; } function grandTotals() { const base = totals(); const extra = (data.draft.avances || []).reduce((sum, av) => sum + (av.amount || 0), 0); const net = base.net + extra; const tax = Number((BigInt(net) * 19n + 50n) / 100n); return {net, tax, total: net + tax};
+    return {net, tax, total: net + tax};
+  }
+  /* Presupuesto total: a diferencia de totals() (que solo suma la tabla de
+     trabajos, para no alterar el resumen de "Presupuesto detallado"), esto
+     tambien suma el "Monto adicional" opcional que puede llevar un avance
+     (p.ej. un anexo tecnico cotizado aparte). */
+  function grandTotals() {
+    const base = totals();
+    const extra = (data.draft.avances || []).reduce((sum, av) => sum + (av.amount || 0), 0);
+    const net = base.net + extra;
+    const tax = Number((BigInt(net) * 19n + 50n) / 100n);
+    return {net, tax, total: net + tax};
   }
   function updateTotals() {
     const values = totals();
@@ -223,11 +235,47 @@
     set('pr-budget-total-iva', fm(t.tax));
     set('pr-budget-total-total', fm(t.total));
     const rowsEl = document.getElementById('pr-budget-total-rows');
-    if (rowsEl) { const itemRows = data.draft.items.map((row, i) => `<tr><td>${i + 1}</td><td>${escape(row.name)}${row.origin ? `<div style="font-size:11px;color:var(--mut);margin-top:2px">Ref.: ${escape(row.origin)}</div>` : ''}</td><td>${escape(row.scope)}</td><td>${fm(row.price)}</td></tr>`); const extraRows = (data.draft.avances || []).filter(av => av.amount).map((av, i) => `<tr><td>${data.draft.items.length + i + 1}</td><td>Avance ${escape(av.date)}${av.note ? ` — ${escape(av.note.slice(0, 60))}` : ''}</td><td>Ver avance del ${escape(av.date)}</td><td>${fm(av.amount)}</td></tr>`); rowsEl.innerHTML = itemRows.concat(extraRows).join(''); }
+    if (rowsEl) {
+      const itemRows = data.draft.items.map((row, i) => `<tr><td>${i + 1}</td><td>${escape(row.name)}${row.origin ? `<div style="font-size:11px;color:var(--mut);margin-top:2px">Ref.: ${escape(row.origin)}</div>` : ''}</td><td>${escape(row.scope)}</td><td>${fm(row.price)}</td></tr>`);
+      const extraRows = (data.draft.avances || []).filter(av => av.amount).map((av, i) => `<tr><td>${data.draft.items.length + i + 1}</td><td>Avance ${escape(av.date)}${av.note ? ` — ${escape(av.note.slice(0, 60))}` : ''}</td><td>Ver avance del ${escape(av.date)}</td><td>${fm(av.amount)}</td></tr>`);
+      rowsEl.innerHTML = itemRows.concat(extraRows).join('');
+    }
   }
   function renderRows() {
     document.getElementById('pr-rows').innerHTML = data.draft.items.map((row, i) => `<tr><td>${i + 1}</td><td><textarea aria-label="Trabajo ${i + 1}" data-row="${i}" data-key="name" rows="3">${escape(row.name)}</textarea><input aria-label="Referencia de origen ${i + 1}" type="text" data-row="${i}" data-key="origin" value="${escape(row.origin || '')}" placeholder="Ref. opcional si viene de un anexo/avance (ej: Anexo técnico N°1)" style="margin-top:6px;font-size:11px"></td><td><textarea aria-label="Alcance ${i + 1}" data-row="${i}" data-key="scope" rows="3">${escape(row.scope)}</textarea></td><td><input aria-label="Valor neto ${i + 1}" type="number" min="0" max="999999999999" step="1" data-row="${i}" data-key="price" value="${row.price}"></td><td><button class="btn bh xs" data-action="remove-row" data-index="${i}" aria-label="Quitar trabajo ${i + 1}">Quitar</button></td></tr>`).join('');
     updateTotals();
+    renderProgress();
+  }
+  /* Barra de avance del proyecto: tablero (15%) y plano/AutoCAD (15%) son
+     avances fijos; el 70% restante se reparte en partes iguales entre cada
+     punto/trabajo del presupuesto, y cada punto se subdivide en canalizado
+     (40%), cableado (40%) y en funcionamiento (20%, la etapa minima). */
+  const PROGRESS_TABLERO_PCT = 15, PROGRESS_PLANO_PCT = 15;
+  const PROGRESS_STAGE_WEIGHTS = {canalizado: 0.4, cableado: 0.4, funcionamiento: 0.2};
+  function computeProgress(project) {
+    const items = project.items || [];
+    const fixedPct = PROGRESS_TABLERO_PCT + PROGRESS_PLANO_PCT;
+    const perItemPct = items.length ? (100 - fixedPct) / items.length : 0;
+    let pct = 0;
+    if (project.tableroDone) pct += PROGRESS_TABLERO_PCT;
+    if (project.planoDone) pct += PROGRESS_PLANO_PCT;
+    items.forEach(it => {
+      Object.keys(PROGRESS_STAGE_WEIGHTS).forEach(stage => { if (it[stage]) pct += perItemPct * PROGRESS_STAGE_WEIGHTS[stage]; });
+    });
+    return Math.round(pct);
+  }
+  function renderProgress() {
+    const items = data.draft.items || [];
+    const pct = computeProgress(data.draft);
+    const bar = document.getElementById('pr-progress-bar'), pctEl = document.getElementById('pr-progress-pct');
+    if (bar) bar.style.width = pct + '%';
+    if (pctEl) pctEl.textContent = pct + '%';
+    const tableroEl = document.getElementById('pr-progress-tablero'); if (tableroEl) tableroEl.checked = !!data.draft.tableroDone;
+    const planoEl = document.getElementById('pr-progress-plano'); if (planoEl) planoEl.checked = !!data.draft.planoDone;
+    const itemsEl = document.getElementById('pr-progress-items');
+    if (itemsEl) {
+      itemsEl.innerHTML = items.length ? items.map((it, i) => `<div class="card" style="background:var(--c2);margin-bottom:8px;padding:10px 13px"><div style="font-weight:700;margin-bottom:8px">${escape(it.name || '(sin nombre)')}</div><label style="display:inline-flex;align-items:center;gap:6px;margin-right:16px;cursor:pointer;font-size:13px"><input type="checkbox" data-action="toggle-stage" data-row="${i}" data-stage="canalizado" ${it.canalizado ? 'checked' : ''}> Canalizado</label><label style="display:inline-flex;align-items:center;gap:6px;margin-right:16px;cursor:pointer;font-size:13px"><input type="checkbox" data-action="toggle-stage" data-row="${i}" data-stage="cableado" ${it.cableado ? 'checked' : ''}> Cableado</label><label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;font-size:13px"><input type="checkbox" data-action="toggle-stage" data-row="${i}" data-stage="funcionamiento" ${it.funcionamiento ? 'checked' : ''}> En funcionamiento</label></div>`).join('') : '<p style="color:var(--mut)">Agrega trabajos en "Presupuesto detallado" para poder marcar su avance.</p>';
+    }
   }
   function renderPhotos() {
     document.getElementById('pr-photos').innerHTML = data.draft.photos.map((photo, i) => `<div class="card pr-photo"><img src="${photo.data}" alt="Fotografía ${i + 1}"><div><label class="L">Fotografía ${i + 1} · Equipo / Lugar</label><input aria-label="Equipo fotografía ${i + 1}" data-photo="${i}" data-key="name" value="${escape(photo.name)}"><label class="L" style="margin-top:10px">Estado / Observación</label><textarea aria-label="Observación fotografía ${i + 1}" data-photo="${i}" data-key="caption" rows="4">${escape(photo.caption)}</textarea><button class="btn bh sm" data-action="remove-photo" data-index="${i}" style="margin-top:10px">Quitar fotografía</button></div></div>`).join('');
@@ -240,9 +288,17 @@
        lista no quede tediosa de leer cuando hay muchos registrados. */
     el.innerHTML = list.length ? list.slice().reverse().map(av => {
       const j = list.indexOf(av);
-      const atts = (av.attachments || []).map((a, k) => { if (a.type === 'pdf') return `<span class="btn bh xs" data-action="ver-avance-adj" data-av="${j}" data-att="${k}" style="cursor:pointer;margin:4px 6px 0 0;display:inline-block">📄 ${escape(a.name)}</span>`; return `<img class="att-thumb" data-action="ver-avance-adj" data-av="${j}" data-att="${k}" data-path="${escape(a.storagePath || '')}" ${a.data ? `src="${a.data}"` : ''} alt="${escape(a.name)}" title="${escape(a.name)}">`; }).join('');
+      const atts = (av.attachments || []).map((a, k) => {
+        if (a.type === 'pdf') return `<span class="btn bh xs" data-action="ver-avance-adj" data-av="${j}" data-att="${k}" style="cursor:pointer;margin:4px 6px 0 0;display:inline-block">📄 ${escape(a.name)}</span>`;
+        return `<img class="att-thumb" data-action="ver-avance-adj" data-av="${j}" data-att="${k}" data-path="${escape(a.storagePath || '')}" ${a.data ? `src="${a.data}"` : ''} alt="${escape(a.name)}" title="${escape(a.name)}">`;
+      }).join('');
       return `<details class="acc avance-item"><summary><span>${escape(av.date)}</span>${av.amount ? `<span style="font-weight:700;color:var(--blue)">+${fm(av.amount)}</span>` : ''}</summary><div class="acc-body"><p class="avance-body-note">${escape(av.note)}</p>${av.amount ? `<p style="font-weight:700;color:var(--blue)">Monto adicional: ${fm(av.amount)}</p>` : ''}${atts ? `<div>${atts}</div>` : ''}<button class="btn bh xs" data-action="remove-avance" data-av="${j}" style="margin-top:10px">Quitar</button></div></details>`;
-    }).join('') : '<p style="color:var(--mut)">Aún no hay avances registrados para este proyecto.</p>'; el.querySelectorAll('.att-thumb').forEach(img => { if (!img.getAttribute('src') && img.dataset.path && window.firebase && firebase.storage) { firebase.storage().ref(img.dataset.path).getDownloadURL().then(url => { img.src = url; }).catch(() => {}); } });
+    }).join('') : '<p style="color:var(--mut)">Aún no hay avances registrados para este proyecto.</p>';
+    el.querySelectorAll('.att-thumb').forEach(img => {
+      if (!img.getAttribute('src') && img.dataset.path && window.firebase && firebase.storage) {
+        firebase.storage().ref(img.dataset.path).getDownloadURL().then(url => { img.src = url; }).catch(() => {});
+      }
+    });
   }
   function renderHistory() {
     const el = document.getElementById('pr-history');
@@ -282,6 +338,7 @@
     if (!ready) { root.innerHTML = '<div class="card">Conectando con el archivo de proyectos…</div>'; return; }
     root.innerHTML = `<div class="card-hi"><div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap"><div><h2>Proyectos · Mano de obra</h2><p style="margin:8px 0;color:var(--mut)">Informe técnico y presupuesto de trabajos. Valores netos en pesos chilenos; materiales excluidos.</p></div><button class="btn bh" data-action="new">Nuevo proyecto</button></div><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><button class="btn bg" data-action="save">Guardar proyecto</button><button class="btn bb" data-action="pdf">Generar informe PDF</button><button class="btn bb" data-action="budget">Solo presupuesto PDF</button><button class="btn bh" data-action="backup">Exportar proyecto editable</button><label class="btn bh" for="pr-import">Importar proyecto<input id="pr-import" type="file" accept=".json" hidden></label></div><p id="pr-status" role="status" style="margin-top:10px">Borrador guardado automáticamente en este equipo.</p></div>
     <details class="acc total"><summary><span>💰 Presupuesto total</span><span id="pr-budget-total-price"></span></summary><div class="acc-body"><table class="pr-table" style="min-width:0"><thead><tr><th>Ítem</th><th>Trabajo</th><th>Alcance</th><th>Valor neto</th></tr></thead><tbody id="pr-budget-total-rows"></tbody></table><div style="max-width:340px;margin:14px 0 0 auto"><div class="row"><span>Neto</span><span id="pr-budget-total-net"></span></div><div class="row"><span>IVA 19%</span><span id="pr-budget-total-iva"></span></div><div class="row"><strong>Total</strong><strong id="pr-budget-total-total"></strong></div></div></div></details>
+    <div class="card"><div class="ct">Avance de instalación</div><p style="margin-bottom:12px;color:var(--mut)">Marca aquí el avance real de la obra. El tablero y el plano/AutoCAD valen 15% cada uno; el resto se reparte entre los trabajos del presupuesto. Esto es lo único de esta sección que el cliente puede ver (sin poder editarlo).</p><div style="margin-bottom:14px"><div style="display:flex;justify-content:space-between;font-size:13px;font-weight:700;color:var(--blue);margin-bottom:6px"><span>Progreso general</span><span id="pr-progress-pct">0%</span></div><div style="background:var(--c2);border-radius:999px;height:14px;overflow:hidden"><div id="pr-progress-bar" style="background:var(--blue);height:100%;width:0%;transition:width .2s"></div></div></div><label style="display:flex;align-items:center;gap:8px;margin-bottom:10px;cursor:pointer"><input type="checkbox" id="pr-progress-tablero" data-action="toggle-tablero"> <span>Tablero eléctrico instalado (15%)</span></label><label style="display:flex;align-items:center;gap:8px;margin-bottom:14px;cursor:pointer"><input type="checkbox" id="pr-progress-plano" data-action="toggle-plano"> <span>Plano eléctrico / AutoCAD entregado (15%)</span></label><div id="pr-progress-items"></div></div>
     <div class="card"><div class="ct">Datos del proyecto</div><div class="g2">${field('number', 'N° de informe / presupuesto')}${field('date', 'Fecha')}${field('title', 'Nombre del proyecto *')}${field('client', 'Titular / cliente *')}${field('location', 'Ubicación del proyecto')}${field('author', 'Elaborado por')}</div></div>
     <div class="card"><div class="ct">Informe técnico</div><p style="margin-bottom:12px;color:var(--mut)">Redacta las secciones que necesites. Las secciones vacías se omiten del PDF. Puedes separar los párrafos con una línea en blanco.</p><div class="pr-sections">${field('intro', 'Introducción', true)}${field('diagnosis', 'Observaciones y diagnóstico de la instalación', true, 'Describe los hallazgos y relaciona las fotografías por número.')}${field('corrections', 'Correcciones y verificaciones recomendadas', true)}${field('references', 'Referencias técnicas', true)}</div></div>
     <div class="card"><div class="ct">Registro fotográfico</div><p style="margin-bottom:12px">Agrega imágenes JPG, PNG o WebP (hasta 60). Se numeran en el orden de carga.</p><input id="pr-file" type="file" accept="image/jpeg,image/png,image/webp" multiple><div id="pr-photos" style="margin-top:16px"></div></div>
@@ -372,7 +429,11 @@
       }
       if (action === 'add-avance') {
         const noteEl = document.getElementById('av-note');
-        const note = noteEl ? noteEl.value.trim() : ''; const amountEl = document.getElementById('av-amount'); const amountN = amountEl ? Number(amountEl.value) : 0; if (amountEl && amountEl.value && (!Number.isSafeInteger(amountN) || amountN < 0 || amountN > 999999999999)) { alert('El monto adicional debe ser un valor en pesos entero, positivo o cero.'); return; } const amount = Number.isFinite(amountN) && amountN > 0 ? amountN : 0;
+        const note = noteEl ? noteEl.value.trim() : '';
+        const amountEl = document.getElementById('av-amount');
+        const amountN = amountEl ? Number(amountEl.value) : 0;
+        if (amountEl && amountEl.value && (!Number.isSafeInteger(amountN) || amountN < 0 || amountN > 999999999999)) { alert('El monto adicional debe ser un valor en pesos entero, positivo o cero.'); return; }
+        const amount = Number.isFinite(amountN) && amountN > 0 ? amountN : 0;
         if (!note && !pendingAvanceFiles.length && !amount) { alert('Escribe una nota, adjunta al menos un archivo o ingresa un monto adicional.'); return; }
         const now = new Date();
         data.draft.avances = data.draft.avances || [];
@@ -382,6 +443,7 @@
         });
         pendingAvanceFiles = [];
         if (noteEl) noteEl.value = '';
+        if (amountEl) amountEl.value = '';
         const pend = document.getElementById('av-pending'); if (pend) pend.textContent = '';
         renderAvances(); changed();
         await syncDraftToSavedProject();
@@ -493,6 +555,14 @@
     throw new Error('Usa imágenes JPG/PNG/WebP o PDF: ' + file.name);
   }
   root.addEventListener('change', async event => {
+    const progressAction = event.target.dataset.action;
+    if (progressAction === 'toggle-tablero') { data.draft.tableroDone = event.target.checked; renderProgress(); changed(); await syncDraftToSavedProject(); return; }
+    if (progressAction === 'toggle-plano') { data.draft.planoDone = event.target.checked; renderProgress(); changed(); await syncDraftToSavedProject(); return; }
+    if (progressAction === 'toggle-stage') {
+      const row = data.draft.items[Number(event.target.dataset.row)];
+      if (row) { row[event.target.dataset.stage] = event.target.checked; renderProgress(); changed(); await syncDraftToSavedProject(); }
+      return;
+    }
     if (!['pr-file', 'pr-import', 'av-file'].includes(event.target.id)) return;
     if (busy) { event.target.value = ''; return; }
     busy = true;
