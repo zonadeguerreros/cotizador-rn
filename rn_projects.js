@@ -184,7 +184,7 @@
 
   function blank() {
     const now = new Date();
-    return {id: uid(), number: 'RN-P-' + now.getFullYear() + p2(now.getMonth() + 1) + p2(now.getDate()) + '-' + now.getTime().toString().slice(-5), title: '', client: '', location: '', author: 'Cristhian Sandoval - Cristopher Solis', date: now.getFullYear() + '-' + p2(now.getMonth() + 1) + '-' + p2(now.getDate()), intro: '', diagnosis: '', corrections: '', references: '', scope: 'El presupuesto considera la ejecución de los trabajos detallados, incluyendo mano de obra y servicios técnicos. Los materiales nuevos se cotizarán por separado, previa confirmación de cantidades y aprobación del cliente.', conditions: 'Programación, plazo de ejecución y forma de pago: por acordar por escrito antes del inicio de los trabajos.', approval: 'Con su firma, el cliente acepta los trabajos, alcances, valores y condiciones indicados en este documento. Cualquier modificación o trabajo adicional deberá ser informado y aprobado por escrito antes de su ejecución.', representative: 'Cristhian Sandoval Parra', items: [], photos: [], avances: [], tableroDone: false, planoDone: false, ownerSignature: '', updatedAt: 0};
+    return {id: uid(), number: 'RN-P-' + now.getFullYear() + p2(now.getMonth() + 1) + p2(now.getDate()) + '-' + now.getTime().toString().slice(-5), title: '', client: '', location: '', author: 'Cristhian Sandoval - Cristopher Solis', date: now.getFullYear() + '-' + p2(now.getMonth() + 1) + '-' + p2(now.getDate()), intro: '', diagnosis: '', corrections: '', references: '', scope: 'El presupuesto considera la ejecución de los trabajos detallados, incluyendo mano de obra y servicios técnicos. Los materiales nuevos se cotizarán por separado, previa confirmación de cantidades y aprobación del cliente.', conditions: 'Programación, plazo de ejecución y forma de pago: por acordar por escrito antes del inicio de los trabajos.', approval: 'Con su firma, el cliente acepta los trabajos, alcances, valores y condiciones indicados en este documento. Cualquier modificación o trabajo adicional deberá ser informado y aprobado por escrito antes de su ejecución.', representative: 'Cristhian Sandoval Parra', items: [], photos: [], avances: [], tableroDone: false, planoDone: false, ownerSignature: '', clientSignatureCache: '', updatedAt: 0};
   }
   function status(message, error) {
     const el = document.getElementById('pr-status');
@@ -327,6 +327,15 @@
           ? `<p style="margin-top:10px;font-weight:700">Firma del cliente:</p><img src="${acc.signature}" alt="Firma del cliente" style="max-width:260px;border:1px solid var(--bd);border-radius:8px;background:#fff">`
           : `<p style="margin-top:10px;color:var(--mut)">El cliente aún no ha firmado.</p>`;
         box.innerHTML = `<p>Cliente con acceso a este proyecto: <strong>${escape(email)}</strong></p>${clientSigHtml}<button class="btn br sm" data-action="revoke-client" style="margin-top:10px">Revocar acceso</button>`;
+        /* Se copia la firma del cliente al proyecto (aunque solo viva de
+           verdad en su cuenta de Firestore) para que el generador de PDF,
+           que no tiene acceso a la nube en ese momento, pueda incluirla. */
+        const newClientSig = (acc && acc.signature) || '';
+        if (data.draft.id === projectId && data.draft.clientSignatureCache !== newClientSig) {
+          data.draft.clientSignatureCache = newClientSig;
+          changed();
+          syncDraftToSavedProject();
+        }
         return;
       }
       const pending = await firebase.firestore().collection('clientAccounts').where('projectNumber', '==', projectNumber).where('status', '==', 'pending').get();
