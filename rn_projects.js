@@ -372,6 +372,22 @@
     if (!data.draft.items.length || data.draft.items.some(row => !row.name.trim())) { alert('Agrega al menos un trabajo y completa el nombre de cada uno.'); return false; }
     return true;
   }
+  /* Si este borrador se cargo antes de que otra sesion/dispositivo agregara
+     un avance nuevo, guardar aqui sin mas reemplazaria todo el proyecto con
+     una version vieja y borraria ese avance ajeno. Se conserva (union por
+     id) cualquier avance que ya estuviera guardado y que el borrador actual
+     no tenga, para que agregar o tickear algo en un lugar nunca borre lo
+     que se agrego en otro. */
+  function mergeAvances(savedProject, draftEntry) {
+    const saved = (savedProject && savedProject.avances) || [];
+    const draftIds = new Set((draftEntry.avances || []).map(av => av.id));
+    /* No revivir un avance que se borro a proposito (en esta sesion o en
+       otra): reutiliza la misma lista de tombstones ya sincronizada con la
+       nube que usan los proyectos eliminados. */
+    const deleted = new Set(cloudDelGet());
+    const missing = saved.filter(av => !draftIds.has(av.id) && !deleted.has(av.id));
+    return (draftEntry.avances || []).concat(missing);
+  }
   async function saveProject() {
     if (!valid()) return false;
     /* Espera a que termine cualquier fusion de la nube en curso antes de
@@ -383,8 +399,10 @@
     const entry = clone(data.draft);
     entry.updatedAt = Date.now();
     const i = data.projects.findIndex(p => p.id === entry.id);
+    if (i >= 0) { entry.avances = mergeAvances(data.projects[i], entry); data.draft.avances = entry.avances; }
     if (i < 0) data.projects.unshift(entry); else data.projects[i] = entry;
     if (!await persist()) { data.projects = previous; return false; }
+    renderAvances();
     renderHistory(); status('Proyecto guardado. Puedes volver a abrirlo en la lista inferior.');
     try { renderClientAccess(); } catch (e) {}
     return true;
@@ -405,8 +423,11 @@
     const previous = clone(data.projects);
     const entry = clone(data.draft);
     entry.updatedAt = Date.now();
+    entry.avances = mergeAvances(data.projects[i], entry);
+    data.draft.avances = entry.avances;
     data.projects[i] = entry;
     if (!await persist()) { data.projects = previous; return; }
+    renderAvances();
     renderHistory();
     try { renderClientAccess(); } catch (e) {}
   }
@@ -451,6 +472,7 @@
       if (action === 'remove-avance' && confirm('¿Quitar este avance del proyecto?')) {
         const av = data.draft.avances[Number(button.dataset.av)];
         data.draft.avances.splice(Number(button.dataset.av), 1);
+        if (av && av.id) { const d = cloudDelGet(); if (d.indexOf(av.id) < 0) { d.push(av.id); cloudDelSet(d); } }
         renderAvances(); changed();
         await syncDraftToSavedProject();
         if (av) (av.attachments || []).forEach(a => { if (a.storagePath) deleteStoragePhoto(a.storagePath); });
