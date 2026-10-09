@@ -1,7 +1,7 @@
 {
-  "name": "Cotizador R&N",
-  "short_name": "Cotizador R&N",
-  "description": "Cotizador de materiales, historial, proyectos y documentos de R & N Electricidad y Electrónica.",
+  "name": "Cotizador ELECTROVOLT TEMPLE SPA.",
+  "short_name": "Cotizador Electrovolt",
+  "description": "Cotizador de materiales, historial, proyectos y documentos de ELECTROVOLT TEMPLE SPA.",
   "start_url": "./index.html",
   "scope": "./index.html",
   "id": "/cotizador-rn/app",

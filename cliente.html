@@ -4,12 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex,nofollow">
-<title>Portal Cliente R&amp;N</title>
+<title>Portal Cliente ELECTROVOLT TEMPLE SPA.</title>
 <link rel="manifest" href="manifest-cliente.json">
 <meta name="theme-color" content="#163f78">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Portal R&amp;N">
+<meta name="apple-mobile-web-app-title" content="Portal Electrovolt">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -65,7 +65,7 @@ th{color:#64748b;font-weight:700;font-size:11px;text-transform:uppercase}
 </head>
 <body>
 <header>
-  <div><h1>Portal Cliente &middot; R &amp; N Electricidad y Electr&oacute;nica</h1><p>Seguimiento de tu proyecto</p></div>
+  <div><h1>Portal Cliente &middot; ELECTROVOLT TEMPLE SPA.</h1><p>Seguimiento de tu proyecto</p></div>
   <div style="display:flex;gap:8px">
     <button id="account-btn" class="hidden" style="background:transparent;border:1px solid rgba(255,255,255,.35);color:#fff;font-size:12px;padding:7px 12px;border-radius:8px;cursor:pointer">Mi cuenta</button>
     <button id="logout" class="hidden">Cerrar sesi&oacute;n</button>
@@ -96,13 +96,13 @@ th{color:#64748b;font-weight:700;font-size:11px;text-transform:uppercase}
     <button type="submit" class="btn-p" id="fg-go">Enviar enlace</button>
     <div id="msg3"></div>
   </form>
-  <p style="color:#64748b;font-size:12px;margin-top:10px">¿Tu cuenta es antigua y no tiene correo registrado? Contacta directamente a R &amp; N para recuperar el acceso.</p>
+  <p style="color:#64748b;font-size:12px;margin-top:10px">¿Tu cuenta es antigua y no tiene correo registrado? Contacta directamente a ELECTROVOLT TEMPLE SPA. para recuperar el acceso.</p>
   <button type="button" class="btn-s" id="back-forgot">Volver a iniciar sesi&oacute;n</button>
 </div>
 
 <div id="view-signup" class="card hidden">
   <div class="ct">Crear cuenta de cliente</div>
-  <p style="color:#64748b;font-size:13px;margin-bottom:14px">Pide a R &amp; N el n&uacute;mero de tu proyecto (algo como <strong>RN-P-20260924-12345</strong>). Tu cuenta queda pendiente de aprobaci&oacute;n hasta que R &amp; N la confirme.</p>
+  <p style="color:#64748b;font-size:13px;margin-bottom:14px">Pide a ELECTROVOLT TEMPLE SPA. el n&uacute;mero de tu proyecto (algo como <strong>ET-P-20260924-12345</strong>). Tu cuenta queda pendiente de aprobaci&oacute;n hasta que ELECTROVOLT TEMPLE SPA. la confirme.</p>
   <form id="form-signup" autocomplete="on">
     <label class="L" for="su-name">Tu nombre</label>
     <input type="text" id="su-name" autocomplete="name">
@@ -121,12 +121,12 @@ th{color:#64748b;font-weight:700;font-size:11px;text-transform:uppercase}
 <div id="view-pending" class="card hidden">
   <div class="ct">Solicitud pendiente</div>
   <p><span class="pill">Pendiente de aprobaci&oacute;n</span></p>
-  <p style="margin-top:12px;color:#475569">Tu cuenta fue creada, pero R &amp; N todav&iacute;a no la aprueba. Vuelve a intentar entrar m&aacute;s tarde.</p>
+  <p style="margin-top:12px;color:#475569">Tu cuenta fue creada, pero ELECTROVOLT TEMPLE SPA. todav&iacute;a no la aprueba. Vuelve a intentar entrar m&aacute;s tarde.</p>
 </div>
 
 <div id="view-rejected" class="card hidden">
   <div class="ct">Solicitud no aprobada</div>
-  <p style="color:#475569">Tu solicitud de acceso no fue aprobada. Contacta directamente a R &amp; N si crees que es un error.</p>
+  <p style="color:#475569">Tu solicitud de acceso no fue aprobada. Contacta directamente a ELECTROVOLT TEMPLE SPA. si crees que es un error.</p>
 </div>
 
 <div id="view-dash" class="hidden"></div>
@@ -456,7 +456,7 @@ function renderDash(mirror, clientSignature, avanceApprovals){
      resto se reparte en partes iguales entre cada punto del presupuesto,
      y cada punto se subdivide en canalizado (40%), cableado (40%) y en
      funcionamiento (20%, la etapa mínima). Solo lectura para el cliente:
-     estos valores los marca R & N desde su panel. */
+     estos valores los marca ELECTROVOLT TEMPLE SPA. desde su panel. */
   var PROGRESS_TABLERO_PCT=15, PROGRESS_PLANO_PCT=15;
   function computeProgress(mirror){
     var items=mirror.items||[];
@@ -491,8 +491,8 @@ function renderDash(mirror, clientSignature, avanceApprovals){
     +'</div></details>';
 
   var ownerSigHtml = mirror.ownerSignature
-    ? '<img src="'+mirror.ownerSignature+'" alt="Firma de R & N" style="max-width:260px;border:1px solid rgba(0,0,0,.1);border-radius:8px;background:#fff;display:block">'
-    : '<p style="color:#64748b;font-size:13px">R &amp; N aún no ha firmado.</p>';
+    ? '<img src="'+mirror.ownerSignature+'" alt="Firma de ELECTROVOLT TEMPLE SPA." style="max-width:260px;border:1px solid rgba(0,0,0,.1);border-radius:8px;background:#fff;display:block">'
+    : '<p style="color:#64748b;font-size:13px">ELECTROVOLT TEMPLE SPA. aún no ha firmado.</p>';
   var showSigPad = !clientSignature || clientSigEditing;
   var clientSigHtml = showSigPad
     ? '<canvas id="client-sig-canvas" width="320" height="130" style="border:1px solid rgba(0,0,0,.16);border-radius:8px;background:#fff;touch-action:none;cursor:crosshair;display:block;max-width:100%"></canvas>'
@@ -507,7 +507,7 @@ function renderDash(mirror, clientSignature, avanceApprovals){
       +'<button type="button" class="btn-sm btn-outline" id="client-sig-edit">Cambiar mi firma</button>';
   var signatureHtml =
     '<details class="acc"><summary><span>✍️ Firma digital</span></summary><div class="acc-body">'
-    +'<p style="font-weight:700;font-size:13px;margin-bottom:6px;color:#163f78">Firma de R &amp; N</p>'
+    +'<p style="font-weight:700;font-size:13px;margin-bottom:6px;color:#163f78">Firma de ELECTROVOLT TEMPLE SPA.</p>'
     +ownerSigHtml
     +'<p style="font-weight:700;font-size:13px;margin:16px 0 6px;color:#163f78">Tu firma</p>'
     +'<div id="client-sig-area">'+clientSigHtml+'</div>'

@@ -5,7 +5,7 @@
    siempre la version mas nueva (con las correcciones de seguridad), asi que
    cachear el documento podria dejar a alguien atascado en una version vieja.
    Solo deja pasar las peticiones directo a la red. */
-const VERSION = 'rn-sw-v1';
+const VERSION = 'et-sw-v1';
 
 self.addEventListener('install', function (event) {
   self.skipWaiting();

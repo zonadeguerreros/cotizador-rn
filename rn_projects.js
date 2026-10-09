@@ -184,7 +184,7 @@
 
   function blank() {
     const now = new Date();
-    return {id: uid(), number: 'RN-P-' + now.getFullYear() + p2(now.getMonth() + 1) + p2(now.getDate()) + '-' + now.getTime().toString().slice(-5), title: '', client: '', location: '', author: 'Cristhian Sandoval - Cristopher Solis', date: now.getFullYear() + '-' + p2(now.getMonth() + 1) + '-' + p2(now.getDate()), intro: '', diagnosis: '', corrections: '', references: '', scope: 'El presupuesto considera la ejecución de los trabajos detallados, incluyendo mano de obra y servicios técnicos. Los materiales nuevos se cotizarán por separado, previa confirmación de cantidades y aprobación del cliente.', conditions: 'Programación, plazo de ejecución y forma de pago: por acordar por escrito antes del inicio de los trabajos.', approval: 'Con su firma, el cliente acepta los trabajos, alcances, valores y condiciones indicados en este documento. Cualquier modificación o trabajo adicional deberá ser informado y aprobado por escrito antes de su ejecución.', representative: 'Cristhian Sandoval Parra', items: [], photos: [], avances: [], tableroDone: false, planoDone: false, ownerSignature: '', clientSignatureCache: '', updatedAt: 0};
+    return {id: uid(), number: 'ET-P-' + now.getFullYear() + p2(now.getMonth() + 1) + p2(now.getDate()) + '-' + now.getTime().toString().slice(-5), title: '', client: '', location: '', author: 'Cristhian Sandoval - Cristopher Solis', date: now.getFullYear() + '-' + p2(now.getMonth() + 1) + '-' + p2(now.getDate()), intro: '', diagnosis: '', corrections: '', references: '', scope: 'El presupuesto considera la ejecución de los trabajos detallados, incluyendo mano de obra y servicios técnicos. Los materiales nuevos se cotizarán por separado, previa confirmación de cantidades y aprobación del cliente.', conditions: 'Programación, plazo de ejecución y forma de pago: por acordar por escrito antes del inicio de los trabajos.', approval: 'Con su firma, el cliente acepta los trabajos, alcances, valores y condiciones indicados en este documento. Cualquier modificación o trabajo adicional deberá ser informado y aprobado por escrito antes de su ejecución.', representative: 'Cristhian Sandoval Parra', items: [], photos: [], avances: [], tableroDone: false, planoDone: false, ownerSignature: '', clientSignatureCache: '', updatedAt: 0};
   }
   function status(message, error) {
     const el = document.getElementById('pr-status');
@@ -372,8 +372,8 @@
     <div class="card"><div class="ct">Registro fotográfico</div><p style="margin-bottom:12px">Agrega imágenes JPG, PNG o WebP (hasta 60). Se numeran en el orden de carga.</p><input id="pr-file" type="file" accept="image/jpeg,image/png,image/webp" multiple><div id="pr-photos" style="margin-top:16px"></div></div>
     <div class="card"><div class="ct">Avances del proyecto</div><p style="margin-bottom:12px;color:var(--mut)">Registra aquí las novedades y el avance del trabajo a medida que ocurren. Si le das acceso al cliente de este proyecto, esto es lo que él va a poder ver y descargar.</p><div id="av-list" style="margin-bottom:14px"></div><div class="card" style="background:rgba(0,0,0,.03)"><label class="L" for="av-note">Nueva nota de avance</label><textarea id="av-note" rows="3" placeholder="Ej: Se realizó el levantamiento inicial del tablero..."></textarea><label class="L" style="margin-top:10px" for="av-amount">Monto adicional (opcional, si este avance incluye un anexo/presupuesto extra)</label><input id="av-amount" type="number" min="0" max="999999999999" step="1" placeholder="Ej: 108000"><label class="L" style="margin-top:10px" for="av-file">Adjuntar fotos o PDF (opcional)</label><input id="av-file" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" multiple><div id="av-pending" style="margin-top:8px;color:var(--mut);font-size:12px"></div><button class="btn bg sm" data-action="add-avance" style="margin-top:12px">+ Agregar avance</button></div></div>
     <div class="card"><div class="ct">Presupuesto detallado · Solo trabajo</div>${field('scope', 'Alcance incluido', true)}<div style="overflow-x:auto;margin-top:16px"><table class="pr-table"><thead><tr><th>Ítem</th><th>Trabajo</th><th>Alcance incluido</th><th>Valor neto CLP</th><th></th></tr></thead><tbody id="pr-rows"></tbody></table></div><button class="btn bb sm" data-action="add-row" style="margin-top:12px">+ Agregar trabajo</button><div class="card-hi" style="max-width:480px;margin:18px 0 0 auto"><div class="row"><span>Total neto de los servicios</span><strong id="pr-net"></strong></div><div class="row"><span>IVA 19%</span><strong id="pr-tax"></strong></div><div class="row"><strong>Total del servicio con IVA</strong><strong id="pr-total"></strong></div><p style="margin-top:10px;color:var(--mut)">Materiales no incluidos. Cada valor corresponde al total neto del trabajo de esa fila.</p></div></div>
-    <div class="card"><div class="ct">Condiciones y aprobación</div><div class="pr-sections">${field('conditions', 'Condiciones de ejecución, pago, plazo y garantía', true)}${field('approval', 'Texto de aprobación del presupuesto', true)}${field('representative', 'Representante R & N para la firma')}</div></div>
-    <div class="card"><div class="ct">Firma digital · R & N</div><p style="margin-bottom:12px;color:var(--mut)">Dibuja tu firma o adjunta una imagen. Esta firma queda guardada en el proyecto y el cliente la puede ver (sin poder editarla).</p><div id="owner-sig-view"></div></div>
+    <div class="card"><div class="ct">Condiciones y aprobación</div><div class="pr-sections">${field('conditions', 'Condiciones de ejecución, pago, plazo y garantía', true)}${field('approval', 'Texto de aprobación del presupuesto', true)}${field('representative', 'Representante ELECTROVOLT TEMPLE SPA. para la firma')}</div></div>
+    <div class="card"><div class="ct">Firma digital · ELECTROVOLT TEMPLE SPA.</div><p style="margin-bottom:12px;color:var(--mut)">Dibuja tu firma o adjunta una imagen. Esta firma queda guardada en el proyecto y el cliente la puede ver (sin poder editarla).</p><div id="owner-sig-view"></div></div>
     <div class="card"><div class="ct">Acceso del cliente</div><div id="client-access-box"><p style="color:var(--mut)">Cargando…</p></div></div>
     <div class="card"><div class="ct">Proyectos guardados</div><div id="pr-history"></div></div>`;
     renderRows(); renderPhotos(); renderAvances(); renderHistory(); renderOwnerSignature();
@@ -659,7 +659,7 @@
     if (!el) return;
     const saved = data.draft.ownerSignature;
     if (saved && !ownerSigEditing) {
-      el.innerHTML = `<img src="${saved}" alt="Firma de R & N" style="max-width:320px;display:block;margin-bottom:10px;border:1px solid var(--bd);border-radius:8px;background:#fff"><button class="btn bh sm" data-action="edit-owner-sig">Cambiar firma</button>`;
+      el.innerHTML = `<img src="${saved}" alt="Firma de ELECTROVOLT TEMPLE SPA." style="max-width:320px;display:block;margin-bottom:10px;border:1px solid var(--bd);border-radius:8px;background:#fff"><button class="btn bh sm" data-action="edit-owner-sig">Cambiar firma</button>`;
       return;
     }
     ownerSigPendingUpload = null; ownerSigHasDrawn = false;
@@ -721,14 +721,14 @@
         const file = event.target.files[0];
         if (file.size > 180000000) throw new Error('El archivo es demasiado grande.');
         const imported = JSON.parse(await file.text());
-        if (imported.format !== 'rn-project-v1' || !imported.project || !Array.isArray(imported.project.items) || !Array.isArray(imported.project.photos)) throw new Error('El archivo no es un proyecto editable de R & N.');
+        if (imported.format !== 'rn-project-v1' || !imported.project || !Array.isArray(imported.project.items) || !Array.isArray(imported.project.photos)) throw new Error('El archivo no es un proyecto editable de ELECTROVOLT TEMPLE SPA.');
         if (!confirm('¿Importar este proyecto y reemplazar el borrador actual?')) return;
         // The Python validator checks every field before accepting imported data.
         if (!await persist()) throw new Error('No se pudo guardar el borrador actual antes de importar.');
         const previous = data.draft;
         const candidate = {...blank(), ...imported.project, id: uid()};
         data.draft = candidate;
-        if (!await persist()) { data.draft = previous; throw new Error('No se pudo importar. Revisa que sea un proyecto válido de R & N.'); }
+        if (!await persist()) { data.draft = previous; throw new Error('No se pudo importar. Revisa que sea un proyecto válido de ELECTROVOLT TEMPLE SPA.'); }
         rProyectos(); status('Proyecto importado. Guarda una copia en la lista de proyectos.');
       }
     } catch (error) { status(error.message, true); alert(error.message); }
