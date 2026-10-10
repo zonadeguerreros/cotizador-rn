@@ -81,11 +81,42 @@
       await firebase.firestore().collection('clientView').doc(project.id).set(buildClientView(project), {merge: true});
     } catch (e) { console.warn('No se pudo actualizar la vista del cliente', e); }
   }
+  /* Hasta que la primera fusion con la nube termina, este dispositivo no
+     sube nada: una copia local vieja (sin conexion, app instalada sin abrir
+     por dias) pisaria los datos ya corregidos desde otro dispositivo. */
+  let firstMergeDone = false, firstMergeWaiters = [];
+  function markFirstMerge() {
+    if (firstMergeDone) return;
+    firstMergeDone = true;
+    firstMergeWaiters.splice(0).forEach(fn => fn());
+    if (cloudPendingPush && cloudReady && cloudDoc) { cloudPendingPush = false; cloudPushProjects(); }
+  }
+  function whenFirstMerge(ms) {
+    if (firstMergeDone || !cloudReady) return Promise.resolve();
+    return new Promise(resolve => { firstMergeWaiters.push(resolve); setTimeout(resolve, ms || 15000); });
+  }
   async function cloudPushProjects() {
-    if (!cloudReady || !cloudDoc) { cloudPendingPush = true; return; }
+    if (!cloudReady || !cloudDoc || !firstMergeDone) { cloudPendingPush = true; return; }
     try {
-      for (const p of data.projects) { await cloudUploadPhotos(p); await cloudUploadAvanceFiles(p); await updateClientMirror(p); }
-      await cloudDoc.set({projects: cloudStrip(data.projects), deleted: cloudDelGet(), updatedAt: firebase.firestore.FieldValue.serverTimestamp()});
+      for (const p of data.projects) { await cloudUploadPhotos(p); await cloudUploadAvanceFiles(p); }
+      /* Fusion segura: nunca se pisa en la nube un proyecto que alli sea mas
+         nuevo que la copia local, ni se pierden proyectos que solo existen
+         en la nube y no fueron eliminados. */
+      const snap = await cloudDoc.get();
+      const remote = snap.exists && Array.isArray(snap.data().projects) ? snap.data().projects : [];
+      const remoteDel = snap.exists && Array.isArray(snap.data().deleted) ? snap.data().deleted : [];
+      const delAll = new Set(cloudDelGet().concat(remoteDel));
+      const remoteById = {};
+      remote.forEach(rp => { if (rp && rp.id) remoteById[rp.id] = rp; });
+      const local = cloudStrip(data.projects), out = [], winners = [];
+      local.forEach((lp, i) => {
+        const rp = remoteById[lp.id];
+        if (rp && (rp.updatedAt || 0) > (lp.updatedAt || 0)) out.push(rp);
+        else { out.push(lp); winners.push(data.projects[i]); }
+      });
+      remote.forEach(rp => { if (rp && rp.id && !out.some(p => p.id === rp.id) && !delAll.has(rp.id)) out.push(rp); });
+      for (const p of winners) await updateClientMirror(p);
+      await cloudDoc.set({projects: out.filter(p => !delAll.has(p.id)), deleted: Array.from(delAll).slice(-500), updatedAt: firebase.firestore.FieldValue.serverTimestamp()});
     } catch (e) { console.warn('Sync proyectos: no se pudo guardar en la nube', e); }
   }
   async function cloudDownloadFile(storagePath) {
@@ -103,7 +134,8 @@
        si llega un segundo cambio remoto mientras se procesa el anterior
        (que puede tardar varios segundos bajando fotos), se espera su turno
        en vez de pisar el resultado del que ya estaba corriendo. */
-    mergeChain = mergeChain.catch(() => {}).then(() => cloudMergeAndApplyImpl(cloudList, cloudDeleted));
+    mergeChain = mergeChain.catch(() => {}).then(() => cloudMergeAndApplyImpl(cloudList, cloudDeleted)).then(
+      () => { markFirstMerge(); }, e => { markFirstMerge(); throw e; });
     return mergeChain;
   }
   async function cloudMergeAndApplyImpl(cloudList, cloudDeleted) {
@@ -145,14 +177,28 @@
       }
     }
     const merged = order.map(id => takeCloud.includes(id) ? cloudById[id] : localById[id]);
+    /* Si el borrador abierto es una copia sin cambios de un proyecto que la
+       nube trae mas nuevo, el borrador quedo viejo: se refresca. Asi un
+       dispositivo con copia antigua no vuelve a subir datos ya corregidos
+       (monto, numero o avances eliminados) al tickear o agregar algo. Si el
+       borrador tiene cambios sin guardar, no se toca. */
+    let refreshDraft = null;
+    if (data.draft && data.draft.id && takeCloud.includes(data.draft.id)) {
+      const localSaved = localById[data.draft.id];
+      if (localSaved && sameProjectContent(localSaved, data.draft)) refreshDraft = data.draft.id;
+    }
     /* Tambien cuenta como cambio si un proyecto local quedo excluido solo por
        tombstone (borrado en otro dispositivo), aunque no venga nada nuevo. */
     if (takeCloud.length || merged.length !== (data.projects || []).length) {
       cloudApplyingRemote = true;
       data.projects = merged;
+      if (refreshDraft && cloudById[refreshDraft]) data.draft = clone(cloudById[refreshDraft]);
       await persist();
       cloudApplyingRemote = false;
-      if (S.tab === 'proyectos') renderHistory();
+      if (S.tab === 'proyectos') {
+        renderHistory();
+        if (refreshDraft) { try { rProyectos(); } catch (e) {} }
+      }
     }
     /* Si algun proyecto local quedo mas nuevo o presente solo aqui, se sube. */
     const needPush = order.some(id => (localById[id] && !takeCloud.includes(id)) &&
@@ -166,7 +212,7 @@
       cloudMergeAndApply(Array.isArray(d.projects) ? d.projects : [], Array.isArray(d.deleted) ? d.deleted : []);
     }, err => {
       if (err && err.code === 'permission-denied' && attempt < 5) setTimeout(() => cloudSubscribe(attempt + 1), 1000 * (attempt + 1));
-      else { console.warn('Sync proyectos:', err); if (window.setSyncStatus) setSyncStatus(false); }
+      else { console.warn('Sync proyectos:', err); if (window.setSyncStatus) setSyncStatus(false); markFirstMerge(); }
     });
   }
   function cloudInit() {
@@ -176,7 +222,10 @@
       if (!user || cloudReady) return;
       cloudReady = true;
       cloudSubscribe(0);
-      if (cloudPendingPush) { cloudPendingPush = false; cloudPushProjects(); }
+      /* Si la nube no responde en un tiempo razonable, se habilita igual el
+         guardado (modo sin conexion) para no bloquear al dueño. */
+      setTimeout(markFirstMerge, 25000);
+      if (cloudPendingPush && firstMergeDone) { cloudPendingPush = false; cloudPushProjects(); }
     };
     if (firebase.auth().currentUser) onUser(firebase.auth().currentUser);
     firebase.auth().onAuthStateChanged(onUser);
@@ -415,10 +464,27 @@
        nube que usan los proyectos eliminados. */
     const deleted = new Set(cloudDelGet());
     const missing = saved.filter(av => !draftIds.has(av.id) && !deleted.has(av.id));
-    return (draftEntry.avances || []).concat(missing);
+    /* Un borrador viejo tampoco debe reponer un avance que ya se elimino en
+       otro dispositivo (su id esta en los tombstones sincronizados). */
+    return (draftEntry.avances || []).filter(av => !deleted.has(av.id)).concat(missing);
+  }
+  /* Compara el borrador con el proyecto guardado ignorando la marca de
+     tiempo: si son iguales, el borrador no tiene cambios sin guardar. */
+  function sameProjectContent(a, b) {
+    if (!a || !b) return false;
+    /* Se ignoran campos derivados que la app recalcula sola al abrir
+       (aprobaciones y firma del cliente copiadas desde su cuenta). */
+    const strip = o => {
+      const c = clone(o);
+      delete c.updatedAt; delete c.clientSignatureCache;
+      (c.avances || []).forEach(av => { delete av.clientAgreed; delete av.clientSignature; });
+      return JSON.stringify(c);
+    };
+    return strip(a) === strip(b);
   }
   async function saveProject() {
     if (!valid()) return false;
+    await whenFirstMerge(10000);
     /* Espera a que termine cualquier fusion de la nube en curso antes de
        tocar data.projects (una fusion puede tardar varios segundos bajando
        fotos; si se edita mientras tanto, la fusion podria sobreescribir
@@ -446,15 +512,19 @@
      el cambio queda en el borrador hasta que el dueño lo guarde por primera
      vez, igual que antes. */
   async function syncDraftToSavedProject() {
-    const i = data.projects.findIndex(p => p.id === data.draft.id);
-    if (i < 0) return;
+    if (!data.projects.some(p => p.id === data.draft.id)) return;
+    /* Espera la primera fusion con la nube: asi, un dispositivo con copia
+       vieja primero se pone al dia y recien despues refleja cambios. */
+    await whenFirstMerge(20000);
     await mergeChain.catch(() => {});
+    const j = data.projects.findIndex(p => p.id === data.draft.id);
+    if (j < 0) return;
     const previous = clone(data.projects);
     const entry = clone(data.draft);
     entry.updatedAt = Date.now();
-    entry.avances = mergeAvances(data.projects[i], entry);
+    entry.avances = mergeAvances(data.projects[j], entry);
     data.draft.avances = entry.avances;
-    data.projects[i] = entry;
+    data.projects[j] = entry;
     if (!await persist()) { data.projects = previous; return; }
     renderAvances();
     renderHistory();
