@@ -460,11 +460,13 @@ function renderDash(mirror, clientSignature, avanceApprovals){
   var PROGRESS_TABLERO_PCT=15, PROGRESS_PLANO_PCT=15;
   function computeProgress(mirror){
     var items=mirror.items||[];
-    var fixedPct=PROGRESS_TABLERO_PCT+PROGRESS_PLANO_PCT;
+    var fixedPct=mirror.noFixedProgress?0:PROGRESS_TABLERO_PCT+PROGRESS_PLANO_PCT;
     var perItemPct=items.length ? (100-fixedPct)/items.length : 0;
     var pct=0;
-    if(mirror.tableroDone) pct+=PROGRESS_TABLERO_PCT;
-    if(mirror.planoDone) pct+=PROGRESS_PLANO_PCT;
+    if(!mirror.noFixedProgress){
+      if(mirror.tableroDone) pct+=PROGRESS_TABLERO_PCT;
+      if(mirror.planoDone) pct+=PROGRESS_PLANO_PCT;
+    }
     items.forEach(function(it){
       if(it.canalizado) pct+=perItemPct*0.4;
       if(it.cableado) pct+=perItemPct*0.4;
@@ -485,8 +487,8 @@ function renderDash(mirror, clientSignature, avanceApprovals){
     '<details class="acc"><summary><span>📊 Avance de la instalación</span><span>'+progressPct+'%</span></summary>'
     +'<div class="acc-body">'
     +'<div style="background:#eef2f7;border-radius:999px;height:14px;overflow:hidden;margin-bottom:14px"><div style="background:#163f78;height:100%;width:'+progressPct+'%"></div></div>'
-    +'<div class="row"><span>Tablero eléctrico</span><span>'+(mirror.tableroDone?'✅ Listo':'⬜ Pendiente')+'</span></div>'
-    +'<div class="row"><span>Plano / AutoCAD</span><span>'+(mirror.planoDone?'✅ Listo':'⬜ Pendiente')+'</span></div>'
+    +(mirror.noFixedProgress?'':'<div class="row"><span>Tablero eléctrico</span><span>'+(mirror.tableroDone?'✅ Listo':'⬜ Pendiente')+'</span></div>'
+    +'<div class="row"><span>Plano / AutoCAD</span><span>'+(mirror.planoDone?'✅ Listo':'⬜ Pendiente')+'</span></div>')
     +(progressItemsHtml?'<div style="margin-top:10px">'+progressItemsHtml+'</div>':'')
     +'</div></details>';
 
