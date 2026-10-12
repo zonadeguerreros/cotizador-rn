@@ -274,6 +274,34 @@
       else { console.warn('Sync proyectos:', err); if (window.setSyncStatus) setSyncStatus(false); markFirstMerge(); }
     });
   }
+  /* Migra a Firestore los archivos que aun estan en Cloud Storage (ruta antigua): si los bytes ya
+     estan en este equipo se suben tal cual; si no, se bajan de Storage una vez y se suben. */
+  async function migrateLegacyFiles() {
+    if (!window.rnFiles || !cloudReady) return false;
+    let changed = false;
+    for (const p of data.projects || []) {
+      const items = [].concat(p.photos || [], p.documents || []);
+      (p.avances || []).forEach(av => (av.attachments || []).forEach(a => items.push(a)));
+      for (const it of items) {
+        if (!it || !it.storagePath || rnFiles.isFs(it.storagePath)) continue;
+        if (!it.data) {
+          try { it.data = await cloudDownloadFile(it.storagePath); } catch (e) { continue; }
+        }
+        if (it.data) changed = true;
+      }
+    }
+    return changed;
+  }
+  async function runMigration() {
+    try {
+      if (await migrateLegacyFiles()) {
+        status('Pasando los archivos a la nube nueva…');
+        await cloudPushProjects();
+        await persist();
+        status('Archivos migrados.');
+      }
+    } catch (e) { console.warn('Migracion de archivos:', e); }
+  }
   function cloudInit() {
     if (!window.firebase || !firebase.firestore) return;
     cloudDoc = firebase.firestore().collection('sync').doc('proyectos');
@@ -281,6 +309,7 @@
       if (!user || cloudReady) return;
       cloudReady = true;
       cloudSubscribe(0);
+      whenFirstMerge(60000).then(() => setTimeout(runMigration, 1500));
       /* Si la nube no responde en un tiempo razonable, se habilita igual el
          guardado (modo sin conexion) para no bloquear al dueño. */
       setTimeout(markFirstMerge, 25000);
