@@ -5,6 +5,13 @@
   let data = null, timer, queue = Promise.resolve(), ready = false, busy = false, pendingAvanceFiles = [];
   let ownerSigEditing = false, ownerSigPendingUpload = null, ownerSigHasDrawn = false;
   const escape = escHtml;
+  /* Solo se insertan en el HTML data: URL bien formadas. Cualquier otra cosa
+     que llegue desde la nube (por ejemplo una "firma" manipulada por una
+     cuenta de cliente) se descarta, para que no pueda inyectar codigo. */
+  const DATA_URL_RE = /^data:(?:image\/(?:png|jpeg|webp)|application\/pdf);base64,[A-Za-z0-9+\/]*={0,2}$/;
+  const SIG_RE = /^data:image\/png;base64,[A-Za-z0-9+\/]+={0,2}$/;
+  function safeDataUrl(v) { return (typeof v === 'string' && v.length <= 30000000 && DATA_URL_RE.test(v)) ? v : ''; }
+  function safeSig(v) { return (typeof v === 'string' && v.length <= 400000 && SIG_RE.test(v)) ? v : ''; }
   const clone = value => JSON.parse(JSON.stringify(value));
   const uid = () => 'PR-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
 
@@ -139,7 +146,7 @@
     const blob = await (await fetch(url)).blob();
     return await new Promise((resolve, reject) => {
       const reader = new FileReader();
-      reader.onload = () => resolve(reader.result);
+      reader.onload = () => (safeDataUrl(reader.result) ? resolve(reader.result) : reject(new Error('Tipo de archivo no permitido.')));
       reader.onerror = reject;
       reader.readAsDataURL(blob);
     });
@@ -365,7 +372,7 @@
     }
   }
   function renderPhotos() {
-    document.getElementById('pr-photos').innerHTML = data.draft.photos.map((photo, i) => `<div class="card pr-photo"><img ${photo.data ? `src="${photo.data}"` : ''} data-path="${escape(photo.storagePath || '')}" alt="Fotografía ${i + 1}"><div><label class="L">Fotografía ${i + 1} · Equipo / Lugar</label><input aria-label="Equipo fotografía ${i + 1}" data-photo="${i}" data-key="name" value="${escape(photo.name)}"><label class="L" style="margin-top:10px">Estado / Observación</label><textarea aria-label="Observación fotografía ${i + 1}" data-photo="${i}" data-key="caption" rows="4">${escape(photo.caption)}</textarea><button class="btn bh sm" data-action="remove-photo" data-index="${i}" style="margin-top:10px">Quitar fotografía</button></div></div>`).join('');
+    document.getElementById('pr-photos').innerHTML = data.draft.photos.map((photo, i) => `<div class="card pr-photo"><img ${safeDataUrl(photo.data) ? `src="${safeDataUrl(photo.data)}"` : ''} data-path="${escape(photo.storagePath || '')}" alt="Fotografía ${i + 1}"><div><label class="L">Fotografía ${i + 1} · Equipo / Lugar</label><input aria-label="Equipo fotografía ${i + 1}" data-photo="${i}" data-key="name" value="${escape(photo.name)}"><label class="L" style="margin-top:10px">Estado / Observación</label><textarea aria-label="Observación fotografía ${i + 1}" data-photo="${i}" data-key="caption" rows="4">${escape(photo.caption)}</textarea><button class="btn bh sm" data-action="remove-photo" data-index="${i}" style="margin-top:10px">Quitar fotografía</button></div></div>`).join('');
     document.getElementById('pr-photos').querySelectorAll('img[data-path]').forEach(img => {
       if (!img.getAttribute('src') && img.dataset.path && window.firebase && firebase.storage) {
         firebase.storage().ref(img.dataset.path).getDownloadURL().then(url => { img.src = url; }).catch(() => {});
@@ -388,10 +395,10 @@
       const j = list.indexOf(av);
       const atts = (av.attachments || []).map((a, k) => {
         if (a.type === 'pdf') return `<span class="btn bh xs" data-action="ver-avance-adj" data-av="${j}" data-att="${k}" style="cursor:pointer;margin:4px 6px 0 0;display:inline-block">📄 ${escape(a.name)}</span>`;
-        return `<img class="att-thumb" data-action="ver-avance-adj" data-av="${j}" data-att="${k}" data-path="${escape(a.storagePath || '')}" ${a.data ? `src="${a.data}"` : ''} alt="${escape(a.name)}" title="${escape(a.name)}">`;
+        return `<img class="att-thumb" data-action="ver-avance-adj" data-av="${j}" data-att="${k}" data-path="${escape(a.storagePath || '')}" ${safeDataUrl(a.data) ? `src="${safeDataUrl(a.data)}"` : ''} alt="${escape(a.name)}" title="${escape(a.name)}">`;
       }).join('');
       const clientApprovalHtml = av.clientAgreed
-        ? `<p style="font-weight:700;color:#166534">✅ Aprobado por el cliente${av.clientSignature ? '' : ' (sin firma)'}</p>${av.clientSignature ? `<img src="${av.clientSignature}" alt="Firma del cliente" style="max-width:200px;border:1px solid var(--bd);border-radius:8px;background:#fff;display:block;margin-bottom:8px">` : ''}`
+        ? `<p style="font-weight:700;color:#166534">✅ Aprobado por el cliente${safeSig(av.clientSignature) ? '' : ' (sin firma)'}</p>${safeSig(av.clientSignature) ? `<img src="${safeSig(av.clientSignature)}" alt="Firma del cliente" style="max-width:200px;border:1px solid var(--bd);border-radius:8px;background:#fff;display:block;margin-bottom:8px">` : ''}`
         : `<p style="color:var(--mut)">El cliente aún no ha aprobado este avance.</p>`;
       return `<details class="acc avance-item"><summary><span>${escape(av.date)}</span>${av.amount ? `<span style="font-weight:700;color:var(--blue)">+${fm(av.amount)}</span>` : ''}</summary><div class="acc-body"><p class="avance-body-note">${escape(av.note)}</p>${av.amount ? `<p style="font-weight:700;color:var(--blue)">Monto adicional: ${fm(av.amount)}</p>` : ''}${atts ? `<div>${atts}</div>` : ''}${clientApprovalHtml}<button class="btn bh xs" data-action="remove-avance" data-av="${j}" style="margin-top:10px">Quitar</button></div></details>`;
     }).join('') : '<p style="color:var(--mut)">Aún no hay avances registrados para este proyecto.</p>';
@@ -422,20 +429,20 @@
         const accDoc = await firebase.firestore().collection('clientAccounts').doc(mirror.clientUid).get();
         const acc = accDoc.exists ? accDoc.data() : null;
         const email = acc ? acc.email : '(cuenta no encontrada)';
-        const clientSigHtml = acc && acc.signature
-          ? `<p style="margin-top:10px;font-weight:700">Firma del cliente:</p><img src="${acc.signature}" alt="Firma del cliente" style="max-width:260px;border:1px solid var(--bd);border-radius:8px;background:#fff">`
+        const clientSigHtml = acc && safeSig(acc.signature)
+          ? `<p style="margin-top:10px;font-weight:700">Firma del cliente:</p><img src="${safeSig(acc.signature)}" alt="Firma del cliente" style="max-width:260px;border:1px solid var(--bd);border-radius:8px;background:#fff">`
           : `<p style="margin-top:10px;color:var(--mut)">El cliente aún no ha firmado.</p>`;
         box.innerHTML = `<p>Cliente con acceso a este proyecto: <strong>${escape(email)}</strong></p>${clientSigHtml}<button class="btn br sm" data-action="revoke-client" style="margin-top:10px">Revocar acceso</button>`;
         /* Se copia la firma del cliente al proyecto (aunque solo viva de
            verdad en su cuenta de Firestore) para que el generador de PDF,
            que no tiene acceso a la nube en ese momento, pueda incluirla. */
-        const newClientSig = (acc && acc.signature) || '';
+        const newClientSig = safeSig(acc && acc.signature);
         const approvals = (acc && acc.avanceApprovals) || {};
         let avancesChanged = false;
         if (data.draft.id === projectId) {
           (data.draft.avances || []).forEach(av => {
             const ap = approvals[av.id];
-            const agreed = !!(ap && ap.agreed), sig = (ap && ap.signature) || '';
+            const agreed = !!(ap && ap.agreed), sig = safeSig(ap && ap.signature);
             if (av.clientAgreed !== agreed || av.clientSignature !== sig) { av.clientAgreed = agreed; av.clientSignature = sig; avancesChanged = true; }
           });
         }
@@ -812,7 +819,7 @@
     if (!el) return;
     const saved = data.draft.ownerSignature;
     if (saved && !ownerSigEditing) {
-      el.innerHTML = `<img src="${saved}" alt="Firma de ELECTROVOLT TEMPLE SPA." style="max-width:320px;display:block;margin-bottom:10px;border:1px solid var(--bd);border-radius:8px;background:#fff"><button class="btn bh sm" data-action="edit-owner-sig">Cambiar firma</button>`;
+      el.innerHTML = `<img src="${safeSig(saved)}" alt="Firma de ELECTROVOLT TEMPLE SPA." style="max-width:320px;display:block;margin-bottom:10px;border:1px solid var(--bd);border-radius:8px;background:#fff"><button class="btn bh sm" data-action="edit-owner-sig">Cambiar firma</button>`;
       return;
     }
     ownerSigPendingUpload = null; ownerSigHasDrawn = false;
@@ -859,7 +866,7 @@
         if (file) {
           ownerSigPendingUpload = await fileToPngDataUrl(file);
           const prev = document.getElementById('owner-sig-preview');
-          if (prev) prev.innerHTML = `<img src="${ownerSigPendingUpload}" alt="Vista previa" style="max-width:260px;border:1px solid var(--bd);border-radius:8px;background:#fff">`;
+          if (prev) prev.innerHTML = `<img src="${safeSig(ownerSigPendingUpload)}" alt="Vista previa" style="max-width:260px;border:1px solid var(--bd);border-radius:8px;background:#fff">`;
         }
       } else if (event.target.id === 'doc-file') {
         const files = Array.from(event.target.files);

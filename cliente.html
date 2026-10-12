@@ -184,6 +184,8 @@ var auth=firebase.auth(), db=firebase.firestore();
 var authReady=auth.setPersistence(firebase.auth.Auth.Persistence.SESSION).catch(function(){});
 var EMAIL_DOMAIN='@cliente.cotizador-rn.local';
 function escHtml(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
+/* Solo se insertan en el HTML firmas con formato de imagen PNG (data: URL); cualquier otra cosa se descarta. */
+function safeSig(v){return (typeof v==='string'&&v.length<=400000&&/^data:image\/png;base64,[A-Za-z0-9+\/]+={0,2}$/.test(v))?v:'';}
 function toEmail(username){return String(username||'').trim().toLowerCase().replace(/[^a-z0-9._-]/g,'')+EMAIL_DOMAIN;}
 /* Cuentas antiguas se crearon con un usuario (sin @) que internamente se
    guarda como un correo sintetico no real; cuentas nuevas se crean
@@ -493,7 +495,7 @@ function renderDash(mirror, clientSignature, avanceApprovals){
     +'</div></details>';
 
   var ownerSigHtml = mirror.ownerSignature
-    ? '<img src="'+mirror.ownerSignature+'" alt="Firma de ELECTROVOLT TEMPLE SPA." style="max-width:260px;border:1px solid rgba(0,0,0,.1);border-radius:8px;background:#fff;display:block">'
+    ? '<img src="'+safeSig(mirror.ownerSignature)+'" alt="Firma de ELECTROVOLT TEMPLE SPA." style="max-width:260px;border:1px solid rgba(0,0,0,.1);border-radius:8px;background:#fff;display:block">'
     : '<p style="color:#64748b;font-size:13px">ELECTROVOLT TEMPLE SPA. aún no ha firmado.</p>';
   var showSigPad = !clientSignature || clientSigEditing;
   var clientSigHtml = showSigPad
@@ -505,7 +507,7 @@ function renderDash(mirror, clientSignature, avanceApprovals){
       +'<button type="button" class="btn-sm" style="background:#163f78;color:#fff;border:0;cursor:pointer" id="client-sig-save">Guardar mi firma</button>'
       +(clientSignature?'<button type="button" class="btn-sm btn-outline" id="client-sig-cancel">Cancelar</button>':'')
       +'</div><div id="client-sig-msg" style="min-height:16px;margin-top:6px;font-size:12px;color:#b91c1c"></div>'
-    : '<img src="'+clientSignature+'" alt="Tu firma" style="max-width:260px;border:1px solid rgba(0,0,0,.1);border-radius:8px;background:#fff;display:block;margin-bottom:10px">'
+    : '<img src="'+safeSig(clientSignature)+'" alt="Tu firma" style="max-width:260px;border:1px solid rgba(0,0,0,.1);border-radius:8px;background:#fff;display:block;margin-bottom:10px">'
       +'<button type="button" class="btn-sm btn-outline" id="client-sig-edit">Cambiar mi firma</button>';
   var signatureHtml =
     '<details class="acc"><summary><span>✍️ Firma digital</span></summary><div class="acc-body">'
@@ -534,7 +536,7 @@ function renderDash(mirror, clientSignature, avanceApprovals){
     if(approval && approval.agreed){
       approvalHtml='<div style="margin-top:12px;padding-top:12px;border-top:1px solid rgba(0,0,0,.06)">'
         +'<p style="color:#166534;font-weight:700;font-size:13px">✅ Leíste y aprobaste este avance</p>'
-        +(approval.signature?'<img src="'+approval.signature+'" alt="Tu firma" style="max-width:220px;border:1px solid rgba(0,0,0,.1);border-radius:8px;background:#fff;display:block;margin-top:6px">':'')
+        +(safeSig(approval.signature)?'<img src="'+safeSig(approval.signature)+'" alt="Tu firma" style="max-width:220px;border:1px solid rgba(0,0,0,.1);border-radius:8px;background:#fff;display:block;margin-top:6px">':'')
         +'</div>';
     } else {
       approvalHtml='<div class="av-approval" data-avid="'+escHtml(av.id)+'" style="margin-top:12px;padding-top:12px;border-top:1px solid rgba(0,0,0,.06)">'
