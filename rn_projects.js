@@ -178,16 +178,32 @@
       const lp = localById[id], cp = cloudById[id];
       if (cp && (!lp || (cp.updatedAt || 0) > (lp.updatedAt || 0))) takeCloud.push(id);
     });
+    if (takeCloud.length) {
+      const stEl = document.getElementById('pr-status');
+      if (stEl) { stEl.textContent = 'Sincronizando con la nube… (puede tardar si hay archivos nuevos)'; stEl.style.color = '#b45309'; }
+    }
     for (const id of takeCloud) {
       const p = cloudById[id], kept = [];
+      /* Lo que este equipo ya tiene descargado (misma ruta en Storage) se reutiliza:
+         solo se bajan los archivos nuevos, no todo el proyecto en cada cambio. */
+      const have = {};
+      const lpOld = localById[id];
+      if (lpOld) {
+        (lpOld.photos || []).forEach(x => { if (x && x.storagePath && x.data) have[x.storagePath] = x.data; });
+        (lpOld.avances || []).forEach(av => (av.attachments || []).forEach(a => { if (a && a.storagePath && a.data) have[a.storagePath] = a.data; }));
+        (lpOld.documents || []).forEach(x => { if (x && x.storagePath && x.data) have[x.storagePath] = x.data; });
+      }
       /* Si una descarga falla (sin conexion, otro origen) el archivo NO se
          descarta: se conserva su referencia (storagePath) sin los bytes. Asi
          una falla pasajera nunca borra adjuntos de la nube al volver a subir
          el proyecto; se ven igual desde Storage. */
       for (const ph of (p.photos || [])) {
         if (!ph.data && ph.storagePath) {
-          try { ph.data = await cloudDownloadFile(ph.storagePath); }
-          catch (e) { console.warn('No se pudo bajar una fotografia de la nube, se conserva la referencia:', e); }
+          if (have[ph.storagePath]) ph.data = have[ph.storagePath];
+          else {
+            try { ph.data = await cloudDownloadFile(ph.storagePath); }
+            catch (e) { console.warn('No se pudo bajar una fotografia de la nube, se conserva la referencia:', e); }
+          }
           kept.push(ph);
         } else if (ph.data || ph.storagePath) kept.push(ph);
       }
@@ -196,8 +212,11 @@
         const keptAtt = [];
         for (const a of (av.attachments || [])) {
           if (!a.data && a.storagePath) {
-            try { a.data = await cloudDownloadFile(a.storagePath); }
-            catch (e) { console.warn('No se pudo bajar un adjunto de avance, se conserva la referencia:', e); }
+            if (have[a.storagePath]) a.data = have[a.storagePath];
+            else {
+              try { a.data = await cloudDownloadFile(a.storagePath); }
+              catch (e) { console.warn('No se pudo bajar un adjunto de avance, se conserva la referencia:', e); }
+            }
             keptAtt.push(a);
           } else if (a.data || a.storagePath) keptAtt.push(a);
         }
@@ -206,8 +225,11 @@
       const keptDocs = [];
       for (const d of (p.documents || [])) {
         if (!d.data && d.storagePath) {
-          try { d.data = await cloudDownloadFile(d.storagePath); }
-          catch (e) { console.warn('No se pudo bajar un documento del proyecto, se conserva la referencia:', e); }
+          if (have[d.storagePath]) d.data = have[d.storagePath];
+          else {
+            try { d.data = await cloudDownloadFile(d.storagePath); }
+            catch (e) { console.warn('No se pudo bajar un documento del proyecto, se conserva la referencia:', e); }
+          }
           keptDocs.push(d);
         } else if (d.data || d.storagePath) keptDocs.push(d);
       }
@@ -232,6 +254,7 @@
       if (refreshDraft && cloudById[refreshDraft]) data.draft = clone(cloudById[refreshDraft]);
       await persist();
       cloudApplyingRemote = false;
+      if (takeCloud.length) status('Sincronizado con la nube.');
       if (S.tab === 'proyectos') {
         renderHistory();
         if (refreshDraft) { try { rProyectos(); } catch (e) {} }
