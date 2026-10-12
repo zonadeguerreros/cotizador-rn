@@ -167,15 +167,17 @@ th{color:#64748b;font-weight:700;font-size:11px;text-transform:uppercase}
 <script src="https://cdn.jsdelivr.net/npm/firebase@10.14.1/firebase-firestore-compat.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/firebase@10.14.1/firebase-storage-compat.js"></script>
 <script>
-firebase.initializeApp({
+/* App de Firebase propia del portal ("cliente"): su sesion no se mezcla con la de
+   la consola del dueno, que vive en el mismo sitio con la app por defecto. */
+var APP=firebase.initializeApp({
   apiKey:"AIzaSyAaFoYefcJLaBMlD4Ft9qhLslbuHGm7xVs",
   authDomain:"cotizador-r-y-n.firebaseapp.com",
   projectId:"cotizador-r-y-n",
   storageBucket:"cotizador-r-y-n.firebasestorage.app",
   messagingSenderId:"732030961262",
   appId:"1:732030961262:web:1d56b786de81844263c87f"
-});
-var auth=firebase.auth(), db=firebase.firestore();
+}, 'cliente');
+var auth=APP.auth(), db=APP.firestore();
 /* Sesion aislada por pestana: este sitio tambien sirve index.html (el
    dueno), y Firebase comparte la sesion entre pestanas del mismo sitio
    por defecto (localStorage). Con SESSION queda por pestana, para que
@@ -239,7 +241,7 @@ function openViewer(name,storagePath,isPdf){
   if(isPdf===undefined)isPdf=/\.pdf$/i.test(name||'');
   if(isPdf){
     var win=window.open('','_blank');
-    firebase.storage().ref(storagePath).getDownloadURL().then(function(url){
+    APP.storage().ref(storagePath).getDownloadURL().then(function(url){
       if(win)win.location=url;
     }).catch(function(e){
       if(win)win.close();
@@ -252,7 +254,7 @@ function openViewer(name,storagePath,isPdf){
   document.getElementById('viewer-frame').src='about:blank';
   document.getElementById('viewer-open').href='#';
   ov.style.display='block';
-  firebase.storage().ref(storagePath).getDownloadURL().then(function(url){
+  APP.storage().ref(storagePath).getDownloadURL().then(function(url){
     document.getElementById('viewer-frame').src=url;
     document.getElementById('viewer-open').href=url;
   }).catch(function(e){
@@ -587,7 +589,7 @@ function renderDash(mirror, clientSignature, avanceApprovals){
 
   document.querySelectorAll('.photo-grid img').forEach(function(img){
     var path=img.dataset.path;
-    if(path) firebase.storage().ref(path).getDownloadURL().then(function(url){img.src=url;}).catch(function(){});
+    if(path) APP.storage().ref(path).getDownloadURL().then(function(url){img.src=url;}).catch(function(){});
     img.onclick=function(){ if(path) openViewer(img.dataset.name,path,false); };
   });
   document.querySelectorAll('.att').forEach(function(el){
@@ -595,7 +597,7 @@ function renderDash(mirror, clientSignature, avanceApprovals){
   });
   document.querySelectorAll('.att-thumb').forEach(function(img){
     var path=img.dataset.path;
-    if(path) firebase.storage().ref(path).getDownloadURL().then(function(url){img.src=url;}).catch(function(){});
+    if(path) APP.storage().ref(path).getDownloadURL().then(function(url){img.src=url;}).catch(function(){});
     img.onclick=function(){ if(path) openViewer(img.dataset.name,path,false); };
   });
 
