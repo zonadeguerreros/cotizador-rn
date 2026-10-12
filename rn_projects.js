@@ -23,7 +23,8 @@
       avances: (p.avances || []).map(av => ({
         id: av.id, date: av.date, note: av.note, amount: av.amount || 0,
         attachments: (av.attachments || []).map(a => ({name: a.name, type: a.type, storagePath: a.storagePath || null}))
-      }))
+      })),
+      documents: (p.documents || []).map(d => ({id: d.id, name: d.name, type: d.type, storagePath: d.storagePath || null}))
     }));
   }
   async function cloudUploadPhotos(project) {
@@ -57,6 +58,19 @@
       }
     }
   }
+  async function cloudUploadDocuments(project) {
+    if (!window.firebase || !firebase.storage) return;
+    for (const d of (project.documents || [])) {
+      if (d.data && !d.storagePath) {
+        try {
+          const ext = d.type === 'pdf' ? '.pdf' : '.jpg';
+          const path = 'avances/' + project.id + '/docs/' + uid() + ext;
+          await firebase.storage().ref(path).putString(d.data, 'data_url');
+          d.storagePath = path;
+        } catch (e) { console.warn('No se pudo subir un documento del proyecto a la nube', e); }
+      }
+    }
+  }
   function buildClientView(p) {
     return {
       title: p.title || '', client: p.client || '', location: p.location || '', date: p.date || '', author: p.author || '',
@@ -68,6 +82,7 @@
         id: av.id, date: av.date, note: av.note, amount: av.amount || 0,
         attachments: (av.attachments || []).map(a => ({name: a.name, type: a.type, storagePath: a.storagePath || null}))
       })),
+      documents: (p.documents || []).map(d => ({id: d.id, name: d.name, type: d.type, storagePath: d.storagePath || null})),
       tableroDone: !!p.tableroDone, planoDone: !!p.planoDone, noFixedProgress: !!p.noFixedProgress,
       ownerSignature: p.ownerSignature || '',
       updatedAt: Date.now()
@@ -98,7 +113,7 @@
   async function cloudPushProjects() {
     if (!cloudReady || !cloudDoc || !firstMergeDone) { cloudPendingPush = true; return; }
     try {
-      for (const p of data.projects) { await cloudUploadPhotos(p); await cloudUploadAvanceFiles(p); }
+      for (const p of data.projects) { await cloudUploadPhotos(p); await cloudUploadAvanceFiles(p); await cloudUploadDocuments(p); }
       /* Fusion segura: nunca se pisa en la nube un proyecto que alli sea mas
          nuevo que la copia local, ni se pierden proyectos que solo existen
          en la nube y no fueron eliminados. */
@@ -158,23 +173,38 @@
     });
     for (const id of takeCloud) {
       const p = cloudById[id], kept = [];
+      /* Si una descarga falla (sin conexion, otro origen) el archivo NO se
+         descarta: se conserva su referencia (storagePath) sin los bytes. Asi
+         una falla pasajera nunca borra adjuntos de la nube al volver a subir
+         el proyecto; se ven igual desde Storage. */
       for (const ph of (p.photos || [])) {
         if (!ph.data && ph.storagePath) {
-          try { ph.data = await cloudDownloadFile(ph.storagePath); kept.push(ph); }
-          catch (e) { console.warn('No se pudo bajar una fotografia de la nube, se omite:', e); }
-        } else if (ph.data) kept.push(ph);
+          try { ph.data = await cloudDownloadFile(ph.storagePath); }
+          catch (e) { console.warn('No se pudo bajar una fotografia de la nube, se conserva la referencia:', e); }
+          kept.push(ph);
+        } else if (ph.data || ph.storagePath) kept.push(ph);
       }
       p.photos = kept;
       for (const av of (p.avances || [])) {
         const keptAtt = [];
         for (const a of (av.attachments || [])) {
           if (!a.data && a.storagePath) {
-            try { a.data = await cloudDownloadFile(a.storagePath); keptAtt.push(a); }
-            catch (e) { console.warn('No se pudo bajar un adjunto de avance, se omite:', e); }
-          } else if (a.data) keptAtt.push(a);
+            try { a.data = await cloudDownloadFile(a.storagePath); }
+            catch (e) { console.warn('No se pudo bajar un adjunto de avance, se conserva la referencia:', e); }
+            keptAtt.push(a);
+          } else if (a.data || a.storagePath) keptAtt.push(a);
         }
         av.attachments = keptAtt;
       }
+      const keptDocs = [];
+      for (const d of (p.documents || [])) {
+        if (!d.data && d.storagePath) {
+          try { d.data = await cloudDownloadFile(d.storagePath); }
+          catch (e) { console.warn('No se pudo bajar un documento del proyecto, se conserva la referencia:', e); }
+          keptDocs.push(d);
+        } else if (d.data || d.storagePath) keptDocs.push(d);
+      }
+      p.documents = keptDocs;
     }
     const merged = order.map(id => takeCloud.includes(id) ? cloudById[id] : localById[id]);
     /* Si el borrador abierto es una copia sin cambios de un proyecto que la
@@ -233,7 +263,7 @@
 
   function blank() {
     const now = new Date();
-    return {id: uid(), number: 'ET-P-' + now.getFullYear() + p2(now.getMonth() + 1) + p2(now.getDate()) + '-' + now.getTime().toString().slice(-5), title: '', client: '', location: '', author: 'Cristhian Sandoval - Cristopher Solis', date: now.getFullYear() + '-' + p2(now.getMonth() + 1) + '-' + p2(now.getDate()), intro: '', diagnosis: '', corrections: '', references: '', scope: 'El presupuesto considera la ejecución de los trabajos detallados, incluyendo mano de obra y servicios técnicos. Los materiales nuevos se cotizarán por separado, previa confirmación de cantidades y aprobación del cliente.', conditions: 'Programación, plazo de ejecución y forma de pago: por acordar por escrito antes del inicio de los trabajos.', approval: 'Con su firma, el cliente acepta los trabajos, alcances, valores y condiciones indicados en este documento. Cualquier modificación o trabajo adicional deberá ser informado y aprobado por escrito antes de su ejecución.', representative: 'Cristhian Sandoval Parra', items: [], photos: [], avances: [], tableroDone: false, planoDone: false, noFixedProgress: false, ownerSignature: '', clientSignatureCache: '', updatedAt: 0};
+    return {id: uid(), number: 'ET-P-' + now.getFullYear() + p2(now.getMonth() + 1) + p2(now.getDate()) + '-' + now.getTime().toString().slice(-5), title: '', client: '', location: '', author: 'Cristhian Sandoval - Cristopher Solis', date: now.getFullYear() + '-' + p2(now.getMonth() + 1) + '-' + p2(now.getDate()), intro: '', diagnosis: '', corrections: '', references: '', scope: 'El presupuesto considera la ejecución de los trabajos detallados, incluyendo mano de obra y servicios técnicos. Los materiales nuevos se cotizarán por separado, previa confirmación de cantidades y aprobación del cliente.', conditions: 'Programación, plazo de ejecución y forma de pago: por acordar por escrito antes del inicio de los trabajos.', approval: 'Con su firma, el cliente acepta los trabajos, alcances, valores y condiciones indicados en este documento. Cualquier modificación o trabajo adicional deberá ser informado y aprobado por escrito antes de su ejecución.', representative: 'Cristhian Sandoval Parra', items: [], photos: [], avances: [], documents: [], tableroDone: false, planoDone: false, noFixedProgress: false, ownerSignature: '', clientSignatureCache: '', updatedAt: 0};
   }
   function status(message, error) {
     const el = document.getElementById('pr-status');
@@ -335,7 +365,18 @@
     }
   }
   function renderPhotos() {
-    document.getElementById('pr-photos').innerHTML = data.draft.photos.map((photo, i) => `<div class="card pr-photo"><img src="${photo.data}" alt="Fotografía ${i + 1}"><div><label class="L">Fotografía ${i + 1} · Equipo / Lugar</label><input aria-label="Equipo fotografía ${i + 1}" data-photo="${i}" data-key="name" value="${escape(photo.name)}"><label class="L" style="margin-top:10px">Estado / Observación</label><textarea aria-label="Observación fotografía ${i + 1}" data-photo="${i}" data-key="caption" rows="4">${escape(photo.caption)}</textarea><button class="btn bh sm" data-action="remove-photo" data-index="${i}" style="margin-top:10px">Quitar fotografía</button></div></div>`).join('');
+    document.getElementById('pr-photos').innerHTML = data.draft.photos.map((photo, i) => `<div class="card pr-photo"><img ${photo.data ? `src="${photo.data}"` : ''} data-path="${escape(photo.storagePath || '')}" alt="Fotografía ${i + 1}"><div><label class="L">Fotografía ${i + 1} · Equipo / Lugar</label><input aria-label="Equipo fotografía ${i + 1}" data-photo="${i}" data-key="name" value="${escape(photo.name)}"><label class="L" style="margin-top:10px">Estado / Observación</label><textarea aria-label="Observación fotografía ${i + 1}" data-photo="${i}" data-key="caption" rows="4">${escape(photo.caption)}</textarea><button class="btn bh sm" data-action="remove-photo" data-index="${i}" style="margin-top:10px">Quitar fotografía</button></div></div>`).join('');
+    document.getElementById('pr-photos').querySelectorAll('img[data-path]').forEach(img => {
+      if (!img.getAttribute('src') && img.dataset.path && window.firebase && firebase.storage) {
+        firebase.storage().ref(img.dataset.path).getDownloadURL().then(url => { img.src = url; }).catch(() => {});
+      }
+    });
+  }
+  function renderDocuments() {
+    const el = document.getElementById('pr-docs');
+    if (!el) return;
+    const docs = data.draft.documents || [];
+    el.innerHTML = docs.length ? docs.map((d, i) => `<div class="hcard" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>${d.type === 'pdf' ? '📄' : '🖼️'} <strong>${escape(d.name)}</strong></span><span><button class="btn bh xs" data-action="ver-doc" data-index="${i}">Ver</button> <button class="btn bh xs" data-action="remove-doc" data-index="${i}">Quitar</button></span></div>`).join('') : '<p style="color:var(--mut)">Aún no hay documentos de respaldo en este proyecto.</p>';
   }
   function renderAvances() {
     const el = document.getElementById('av-list');
@@ -425,13 +466,14 @@
     <div class="card"><div class="ct">Datos del proyecto</div><div class="g2">${field('number', 'N° de informe / presupuesto')}${field('date', 'Fecha')}${field('title', 'Nombre del proyecto *')}${field('client', 'Titular / cliente *')}${field('location', 'Ubicación del proyecto')}${field('author', 'Elaborado por')}</div></div>
     <div class="card"><div class="ct">Informe técnico</div><p style="margin-bottom:12px;color:var(--mut)">Redacta las secciones que necesites. Las secciones vacías se omiten del PDF. Puedes separar los párrafos con una línea en blanco.</p><div class="pr-sections">${field('intro', 'Introducción', true)}${field('diagnosis', 'Observaciones y diagnóstico de la instalación', true, 'Describe los hallazgos y relaciona las fotografías por número.')}${field('corrections', 'Correcciones y verificaciones recomendadas', true)}${field('references', 'Referencias técnicas', true)}</div></div>
     <div class="card"><div class="ct">Registro fotográfico</div><p style="margin-bottom:12px">Agrega imágenes JPG, PNG o WebP (hasta 60). Se numeran en el orden de carga.</p><input id="pr-file" type="file" accept="image/jpeg,image/png,image/webp" multiple><div id="pr-photos" style="margin-top:16px"></div></div>
+    <div class="card"><div class="ct">Documentos de respaldo del proyecto</div><p style="margin-bottom:12px;color:var(--mut)">Adjunta aquí la cotización, informes, anexos u otros documentos de respaldo del proyecto (PDF o imágenes). No son avances: quedan como parte del proyecto, y el cliente los puede ver y descargar desde su portal.</p><div id="pr-docs" style="margin-bottom:12px"></div><label class="L" for="doc-file">Agregar documento (PDF o imagen)</label><input id="doc-file" type="file" accept="application/pdf,image/jpeg,image/png,image/webp" multiple></div>
     <div class="card"><div class="ct">Avances del proyecto</div><p style="margin-bottom:12px;color:var(--mut)">Registra aquí las novedades y el avance del trabajo a medida que ocurren. Si le das acceso al cliente de este proyecto, esto es lo que él va a poder ver y descargar.</p><div id="av-list" style="margin-bottom:14px"></div><div class="card" style="background:rgba(0,0,0,.03)"><label class="L" for="av-note">Nueva nota de avance</label><textarea id="av-note" rows="3" placeholder="Ej: Se realizó el levantamiento inicial del tablero..."></textarea><label class="L" style="margin-top:10px" for="av-amount">Monto adicional (opcional, si este avance incluye un anexo/presupuesto extra)</label><input id="av-amount" type="number" min="0" max="999999999999" step="1" placeholder="Ej: 108000"><label class="L" style="margin-top:10px" for="av-file">Adjuntar fotos o PDF (opcional)</label><input id="av-file" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" multiple><div id="av-pending" style="margin-top:8px;color:var(--mut);font-size:12px"></div><button class="btn bg sm" data-action="add-avance" style="margin-top:12px">+ Agregar avance</button></div></div>
     <div class="card"><div class="ct">Presupuesto detallado · Solo trabajo</div>${field('scope', 'Alcance incluido', true)}<div style="overflow-x:auto;margin-top:16px"><table class="pr-table"><thead><tr><th>Ítem</th><th>Trabajo</th><th>Alcance incluido</th><th>Valor neto CLP</th><th></th></tr></thead><tbody id="pr-rows"></tbody></table></div><button class="btn bb sm" data-action="add-row" style="margin-top:12px">+ Agregar trabajo</button><div class="card-hi" style="max-width:480px;margin:18px 0 0 auto"><div class="row"><span>Total neto de los servicios</span><strong id="pr-net"></strong></div><div class="row"><span>IVA 19%</span><strong id="pr-tax"></strong></div><div class="row"><strong>Total del servicio con IVA</strong><strong id="pr-total"></strong></div><p style="margin-top:10px;color:var(--mut)">Materiales no incluidos. Cada valor corresponde al total neto del trabajo de esa fila.</p></div></div>
     <div class="card"><div class="ct">Condiciones y aprobación</div><div class="pr-sections">${field('conditions', 'Condiciones de ejecución, pago, plazo y garantía', true)}${field('approval', 'Texto de aprobación del presupuesto', true)}${field('representative', 'Representante ELECTROVOLT TEMPLE SPA. para la firma')}</div></div>
     <div class="card"><div class="ct">Firma digital · ELECTROVOLT TEMPLE SPA.</div><p style="margin-bottom:12px;color:var(--mut)">Dibuja tu firma o adjunta una imagen. Esta firma queda guardada en el proyecto y el cliente la puede ver (sin poder editarla).</p><div id="owner-sig-view"></div></div>
     <div class="card"><div class="ct">Acceso del cliente</div><div id="client-access-box"><p style="color:var(--mut)">Cargando…</p></div></div>
     <div class="card"><div class="ct">Proyectos guardados</div><div id="pr-history"></div></div>`;
-    renderRows(); renderPhotos(); renderAvances(); renderHistory(); renderOwnerSignature();
+    renderRows(); renderPhotos(); renderDocuments(); renderAvances(); renderHistory(); renderOwnerSignature();
     try { renderClientAccess(); } catch (e) { console.warn('Acceso de cliente no disponible:', e); }
   };
   root.addEventListener('input', event => {
@@ -474,6 +516,13 @@
        otro dispositivo (su id esta en los tombstones sincronizados). */
     return (draftEntry.avances || []).filter(av => !deleted.has(av.id)).concat(missing);
   }
+  function mergeDocuments(savedProject, draftEntry) {
+    const saved = (savedProject && savedProject.documents) || [];
+    const draftIds = new Set((draftEntry.documents || []).map(d => d.id));
+    const deleted = new Set(cloudDelGet());
+    const missing = saved.filter(d => d.id && !draftIds.has(d.id) && !deleted.has(d.id));
+    return (draftEntry.documents || []).filter(d => !deleted.has(d.id)).concat(missing);
+  }
   /* Compara el borrador con el proyecto guardado ignorando la marca de
      tiempo: si son iguales, el borrador no tiene cambios sin guardar. */
   function sameProjectContent(a, b) {
@@ -500,7 +549,7 @@
     const entry = clone(data.draft);
     entry.updatedAt = Date.now();
     const i = data.projects.findIndex(p => p.id === entry.id);
-    if (i >= 0) { entry.avances = mergeAvances(data.projects[i], entry); data.draft.avances = entry.avances; }
+    if (i >= 0) { entry.avances = mergeAvances(data.projects[i], entry); data.draft.avances = entry.avances; entry.documents = mergeDocuments(data.projects[i], entry); data.draft.documents = entry.documents; }
     if (i < 0) data.projects.unshift(entry); else data.projects[i] = entry;
     if (!await persist()) { data.projects = previous; return false; }
     renderAvances();
@@ -530,6 +579,8 @@
     entry.updatedAt = Date.now();
     entry.avances = mergeAvances(data.projects[j], entry);
     data.draft.avances = entry.avances;
+    entry.documents = mergeDocuments(data.projects[j], entry);
+    data.draft.documents = entry.documents;
     data.projects[j] = entry;
     if (!await persist()) { data.projects = previous; return; }
     renderAvances();
@@ -597,6 +648,32 @@
         ownerSigEditing = false;
         renderOwnerSignature(); changed();
         await syncDraftToSavedProject();
+      }
+      if (action === 'ver-doc') {
+        const d = (data.draft.documents || [])[i];
+        const isPdf = d && d.type === 'pdf';
+        if (d && d.storagePath) openStorageViewer(d.name, d.storagePath, isPdf);
+        else if (d && d.data && isPdf) {
+          const parts = d.data.split(',');
+          const bin = atob(parts[1] || '');
+          const bytes = new Uint8Array(bin.length);
+          for (let k = 0; k < bin.length; k++) bytes[k] = bin.charCodeAt(k);
+          window.open(URL.createObjectURL(new Blob([bytes], {type: 'application/pdf'})), '_blank');
+        } else if (d && d.data) {
+          const ov = ensureDocViewer();
+          document.getElementById('doc-viewer-title').textContent = d.name;
+          document.getElementById('doc-viewer-frame').src = d.data;
+          document.getElementById('doc-viewer-open').href = d.data;
+          ov.style.display = 'block';
+        }
+      }
+      if (action === 'remove-doc' && confirm('¿Quitar este documento del proyecto?')) {
+        const d = (data.draft.documents || [])[i];
+        data.draft.documents.splice(i, 1);
+        if (d && d.id) { const del = cloudDelGet(); if (del.indexOf(d.id) < 0) { del.push(d.id); cloudDelSet(del); } }
+        renderDocuments(); changed();
+        await syncDraftToSavedProject();
+        if (d && d.storagePath) deleteStoragePhoto(d.storagePath);
       }
       if (action === 'ver-avance-adj') {
         const av = data.draft.avances[Number(button.dataset.av)];
@@ -766,7 +843,7 @@
       if (row) { row[event.target.dataset.stage] = event.target.checked; renderProgress(); changed(); await syncDraftToSavedProject(); }
       return;
     }
-    if (!['pr-file', 'pr-import', 'av-file', 'owner-sig-file'].includes(event.target.id)) return;
+    if (!['pr-file', 'pr-import', 'av-file', 'doc-file', 'owner-sig-file'].includes(event.target.id)) return;
     if (busy) { event.target.value = ''; return; }
     busy = true;
     try {
@@ -784,6 +861,19 @@
           const prev = document.getElementById('owner-sig-preview');
           if (prev) prev.innerHTML = `<img src="${ownerSigPendingUpload}" alt="Vista previa" style="max-width:260px;border:1px solid var(--bd);border-radius:8px;background:#fff">`;
         }
+      } else if (event.target.id === 'doc-file') {
+        const files = Array.from(event.target.files);
+        if ((data.draft.documents || []).length + files.length > 20) throw new Error('Máximo 20 documentos por proyecto.');
+        status('Preparando documentos…');
+        const added = [];
+        for (const file of files) {
+          const result = await avanceFileData(file);
+          added.push({id: uid(), name: file.name, type: result.type, data: result.data});
+        }
+        data.draft.documents = (data.draft.documents || []).concat(added);
+        renderDocuments(); changed();
+        await syncDraftToSavedProject();
+        status(added.length + ' documento(s) agregado(s) al proyecto.');
       } else if (event.target.id === 'av-file') {
         const files = Array.from(event.target.files);
         if (pendingAvanceFiles.length + files.length > 20) throw new Error('Máximo 20 adjuntos por avance.');
