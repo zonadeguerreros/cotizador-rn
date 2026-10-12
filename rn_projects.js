@@ -34,47 +34,41 @@
       documents: (p.documents || []).map(d => ({id: d.id, name: d.name, type: d.type, storagePath: d.storagePath || null}))
     }));
   }
+  /* Los archivos viven en Firestore (rnFiles, definido en la pagina principal). Un archivo que aun
+     tiene una ruta antigua de Cloud Storage y cuyos bytes ya estan en este equipo se migra solo. */
+  function needsUpload(item) {
+    return !!(item && item.data && !(window.rnFiles && rnFiles.isFs(item.storagePath)));
+  }
   async function cloudUploadPhotos(project) {
-    if (!window.firebase || !firebase.storage) return;
+    if (!window.firebase || !window.rnFiles) return;
     for (const ph of project.photos) {
-      if (ph.data && !ph.storagePath) {
-        try {
-          const path = 'photos/' + project.id + '/' + uid() + '.jpg';
-          await firebase.storage().ref(path).putString(ph.data, 'data_url');
-          ph.storagePath = path;
-        } catch (e) { console.warn('No se pudo subir una fotografia a la nube', e); }
+      if (needsUpload(ph)) {
+        try { ph.storagePath = await rnFiles.putDataUrl(ph.data, {projectId: project.id, name: ph.name}); }
+        catch (e) { console.warn('No se pudo subir una fotografia a la nube', e); }
       }
     }
   }
   function deleteStoragePhoto(storagePath) {
-    if (!window.firebase || !firebase.storage) return;
-    firebase.storage().ref(storagePath).delete().catch(e => console.warn('No se pudo borrar una fotografia de la nube', e));
+    if (!window.firebase || !window.rnFiles) return;
+    rnFiles.remove(storagePath).catch(e => console.warn('No se pudo borrar un archivo de la nube', e));
   }
   async function cloudUploadAvanceFiles(project) {
-    if (!window.firebase || !firebase.storage) return;
+    if (!window.firebase || !window.rnFiles) return;
     for (const av of (project.avances || [])) {
       for (const a of (av.attachments || [])) {
-        if (a.data && !a.storagePath) {
-          try {
-            const ext = a.type === 'pdf' ? '.pdf' : '.jpg';
-            const path = 'avances/' + project.id + '/' + av.id + '/' + uid() + ext;
-            await firebase.storage().ref(path).putString(a.data, 'data_url');
-            a.storagePath = path;
-          } catch (e) { console.warn('No se pudo subir un adjunto de avance a la nube', e); }
+        if (needsUpload(a)) {
+          try { a.storagePath = await rnFiles.putDataUrl(a.data, {projectId: project.id, name: a.name}); }
+          catch (e) { console.warn('No se pudo subir un adjunto de avance a la nube', e); }
         }
       }
     }
   }
   async function cloudUploadDocuments(project) {
-    if (!window.firebase || !firebase.storage) return;
+    if (!window.firebase || !window.rnFiles) return;
     for (const d of (project.documents || [])) {
-      if (d.data && !d.storagePath) {
-        try {
-          const ext = d.type === 'pdf' ? '.pdf' : '.jpg';
-          const path = 'avances/' + project.id + '/docs/' + uid() + ext;
-          await firebase.storage().ref(path).putString(d.data, 'data_url');
-          d.storagePath = path;
-        } catch (e) { console.warn('No se pudo subir un documento del proyecto a la nube', e); }
+      if (needsUpload(d)) {
+        try { d.storagePath = await rnFiles.putDataUrl(d.data, {projectId: project.id, name: d.name}); }
+        catch (e) { console.warn('No se pudo subir un documento del proyecto a la nube', e); }
       }
     }
   }
@@ -142,6 +136,11 @@
     } catch (e) { console.warn('Sync proyectos: no se pudo guardar en la nube', e); }
   }
   async function cloudDownloadFile(storagePath) {
+    if (window.rnFiles && rnFiles.isFs(storagePath)) {
+      const du = await rnFiles.getDataUrl(storagePath);
+      if (!safeDataUrl(du)) throw new Error('Tipo de archivo no permitido.');
+      return du;
+    }
     const url = await firebase.storage().ref(storagePath).getDownloadURL();
     const blob = await (await fetch(url)).blob();
     return await new Promise((resolve, reject) => {
@@ -397,8 +396,8 @@
   function renderPhotos() {
     document.getElementById('pr-photos').innerHTML = data.draft.photos.map((photo, i) => `<div class="card pr-photo"><img ${safeDataUrl(photo.data) ? `src="${safeDataUrl(photo.data)}"` : ''} data-path="${escape(photo.storagePath || '')}" alt="Fotografía ${i + 1}"><div><label class="L">Fotografía ${i + 1} · Equipo / Lugar</label><input aria-label="Equipo fotografía ${i + 1}" data-photo="${i}" data-key="name" value="${escape(photo.name)}"><label class="L" style="margin-top:10px">Estado / Observación</label><textarea aria-label="Observación fotografía ${i + 1}" data-photo="${i}" data-key="caption" rows="4">${escape(photo.caption)}</textarea><button class="btn bh sm" data-action="remove-photo" data-index="${i}" style="margin-top:10px">Quitar fotografía</button></div></div>`).join('');
     document.getElementById('pr-photos').querySelectorAll('img[data-path]').forEach(img => {
-      if (!img.getAttribute('src') && img.dataset.path && window.firebase && firebase.storage) {
-        firebase.storage().ref(img.dataset.path).getDownloadURL().then(url => { img.src = url; }).catch(() => {});
+      if (!img.getAttribute('src') && img.dataset.path && window.firebase && window.rnFiles) {
+        rnFiles.url(img.dataset.path).then(url => { img.src = url; }).catch(() => {});
       }
     });
   }
@@ -426,8 +425,8 @@
       return `<details class="acc avance-item"><summary><span>${escape(av.date)}</span>${av.amount ? `<span style="font-weight:700;color:var(--blue)">+${fm(av.amount)}</span>` : ''}</summary><div class="acc-body"><p class="avance-body-note">${escape(av.note)}</p>${av.amount ? `<p style="font-weight:700;color:var(--blue)">Monto adicional: ${fm(av.amount)}</p>` : ''}${atts ? `<div>${atts}</div>` : ''}${clientApprovalHtml}<button class="btn bh xs" data-action="remove-avance" data-av="${j}" style="margin-top:10px">Quitar</button></div></details>`;
     }).join('') : '<p style="color:var(--mut)">Aún no hay avances registrados para este proyecto.</p>';
     el.querySelectorAll('.att-thumb').forEach(img => {
-      if (!img.getAttribute('src') && img.dataset.path && window.firebase && firebase.storage) {
-        firebase.storage().ref(img.dataset.path).getDownloadURL().then(url => { img.src = url; }).catch(() => {});
+      if (!img.getAttribute('src') && img.dataset.path && window.firebase && window.rnFiles) {
+        rnFiles.url(img.dataset.path).then(url => { img.src = url; }).catch(() => {});
       }
     });
   }

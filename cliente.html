@@ -233,6 +233,22 @@ document.getElementById('viewer-close').onclick=function(){
 document.getElementById('viewer-overlay').addEventListener('click',function(e){
   if(e.target.id==='viewer-overlay'){document.getElementById('viewer-close').click();}
 });
+/* === Archivos: se leen de Firestore (files/{id}/parts) o, los antiguos, de Cloud Storage === */
+var _urlCache={};
+function fileUrl(path){
+  if(path.indexOf('fs:')!==0) return APP.storage().ref(path).getDownloadURL();
+  if(_urlCache[path]) return Promise.resolve(_urlCache[path]);
+  var id=path.slice(3), ref=db.collection('files').doc(id);
+  return ref.get().then(function(meta){
+    if(!meta.exists) throw new Error('Archivo no encontrado.');
+    var md=meta.data();
+    return ref.collection('parts').orderBy('i').get().then(function(snap){
+      var out=[]; snap.forEach(function(d){out.push(d.data().d);});
+      if(out.length!==md.n) throw new Error('Archivo incompleto.');
+      return fetch('data:'+md.type+';base64,'+out.join('')).then(function(r){return r.blob();});
+    });
+  }).then(function(blob){ _urlCache[path]=URL.createObjectURL(blob); return _urlCache[path]; });
+}
 function openViewer(name,storagePath,isPdf){
   /* Chrome no renderiza el visor de PDF dentro de un iframe (queda en
      blanco aunque el archivo este perfecto); para PDF se abre directo en
@@ -241,7 +257,7 @@ function openViewer(name,storagePath,isPdf){
   if(isPdf===undefined)isPdf=/\.pdf$/i.test(name||'');
   if(isPdf){
     var win=window.open('','_blank');
-    APP.storage().ref(storagePath).getDownloadURL().then(function(url){
+    fileUrl(storagePath).then(function(url){
       if(win)win.location=url;
     }).catch(function(e){
       if(win)win.close();
@@ -254,7 +270,7 @@ function openViewer(name,storagePath,isPdf){
   document.getElementById('viewer-frame').src='about:blank';
   document.getElementById('viewer-open').href='#';
   ov.style.display='block';
-  APP.storage().ref(storagePath).getDownloadURL().then(function(url){
+  fileUrl(storagePath).then(function(url){
     document.getElementById('viewer-frame').src=url;
     document.getElementById('viewer-open').href=url;
   }).catch(function(e){
@@ -589,7 +605,7 @@ function renderDash(mirror, clientSignature, avanceApprovals){
 
   document.querySelectorAll('.photo-grid img').forEach(function(img){
     var path=img.dataset.path;
-    if(path) APP.storage().ref(path).getDownloadURL().then(function(url){img.src=url;}).catch(function(){});
+    if(path) fileUrl(path).then(function(url){img.src=url;}).catch(function(){});
     img.onclick=function(){ if(path) openViewer(img.dataset.name,path,false); };
   });
   document.querySelectorAll('.att').forEach(function(el){
@@ -597,7 +613,7 @@ function renderDash(mirror, clientSignature, avanceApprovals){
   });
   document.querySelectorAll('.att-thumb').forEach(function(img){
     var path=img.dataset.path;
-    if(path) APP.storage().ref(path).getDownloadURL().then(function(url){img.src=url;}).catch(function(){});
+    if(path) fileUrl(path).then(function(url){img.src=url;}).catch(function(){});
     img.onclick=function(){ if(path) openViewer(img.dataset.name,path,false); };
   });
 
