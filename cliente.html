@@ -515,7 +515,7 @@ function renderDash(mirror, clientSignature, avanceApprovals){
   var ownerSigHtml = mirror.ownerSignature
     ? '<img src="'+safeSig(mirror.ownerSignature)+'" alt="Firma de ELECTROVOLT TEMPLE SPA." style="max-width:260px;border:1px solid rgba(0,0,0,.1);border-radius:8px;background:#fff;display:block">'
     : '<p style="color:#64748b;font-size:13px">ELECTROVOLT TEMPLE SPA. aún no ha firmado.</p>';
-  var showSigPad = !clientSignature || clientSigEditing;
+  var showSigPad = !clientSignature;   /* una vez guardada, la firma ya no se puede cambiar */
   var clientSigHtml = showSigPad
     ? '<canvas id="client-sig-canvas" width="320" height="130" style="border:1px solid rgba(0,0,0,.16);border-radius:8px;background:#fff;touch-action:none;cursor:crosshair;display:block;max-width:100%"></canvas>'
       +'<div id="client-sig-preview" style="margin-top:8px"></div>'
@@ -523,10 +523,9 @@ function renderDash(mirror, clientSignature, avanceApprovals){
       +'<button type="button" class="btn-sm btn-outline" id="client-sig-clear">Limpiar</button>'
       +'<label class="btn-sm btn-outline" for="client-sig-file" style="cursor:pointer;display:inline-block">Adjuntar imagen<input id="client-sig-file" type="file" accept="image/jpeg,image/png,image/webp" hidden></label>'
       +'<button type="button" class="btn-sm" style="background:#163f78;color:#fff;border:0;cursor:pointer" id="client-sig-save">Guardar mi firma</button>'
-      +(clientSignature?'<button type="button" class="btn-sm btn-outline" id="client-sig-cancel">Cancelar</button>':'')
       +'</div><div id="client-sig-msg" style="min-height:16px;margin-top:6px;font-size:12px;color:#b91c1c"></div>'
     : '<img src="'+safeSig(clientSignature)+'" alt="Tu firma" style="max-width:260px;border:1px solid rgba(0,0,0,.1);border-radius:8px;background:#fff;display:block;margin-bottom:10px">'
-      +'<button type="button" class="btn-sm btn-outline" id="client-sig-edit">Cambiar mi firma</button>';
+      +'<p style="font-size:12px;color:#64748b;margin:0">Tu firma quedó registrada y ya no se puede modificar.</p>';
   var signatureHtml =
     '<details class="acc"><summary><span>✍️ Firma digital</span></summary><div class="acc-body">'
     +'<p style="font-weight:700;font-size:13px;margin-bottom:6px;color:#163f78">Firma de ELECTROVOLT TEMPLE SPA.</p>'
@@ -620,9 +619,7 @@ function renderDash(mirror, clientSignature, avanceApprovals){
   clientSigPendingUpload=null; clientSigHasDrawn=false;
   if(showSigPad) initSignaturePad('client-sig-canvas');
   var sigEdit=document.getElementById('client-sig-edit');
-  if(sigEdit) sigEdit.onclick=function(){ clientSigEditing=true; renderDash(mirror, clientSignature, avanceApprovals); };
   var sigCancel=document.getElementById('client-sig-cancel');
-  if(sigCancel) sigCancel.onclick=function(){ clientSigEditing=false; renderDash(mirror, clientSignature, avanceApprovals); };
   var sigClear=document.getElementById('client-sig-clear');
   if(sigClear) sigClear.onclick=function(){
     clientSigPendingUpload=null; clientSigHasDrawn=false;

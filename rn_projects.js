@@ -302,6 +302,119 @@
       }
     } catch (e) { console.warn('Migracion de archivos:', e); }
   }
+  /* === COPIAS FIRMADAS ===
+     Cuando el cliente firma (aprueba un avance) en el portal, aqui se estampan su firma y la del dueño en el recuadro
+     de firmas de cada PDF del avance, y se deja una copia "<nombre>_firmado.pdf" junto al original. El lugar de las
+     firmas viene dentro del propio PDF (marca ET-SIG en sus metadatos). Los PDF sin esa marca se omiten. */
+  let pdfLibPromise = null;
+  function loadPdfLib() {
+    if (window.PDFLib) return Promise.resolve(window.PDFLib);
+    if (!pdfLibPromise) {
+      pdfLibPromise = new Promise((resolve, reject) => {
+        const s = document.createElement('script');
+        s.src = 'https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js';
+        s.onload = () => (window.PDFLib ? resolve(window.PDFLib) : reject(new Error('pdf-lib no disponible')));
+        s.onerror = () => { pdfLibPromise = null; reject(new Error('No se pudo cargar pdf-lib')); };
+        document.head.appendChild(s);
+      });
+    }
+    return pdfLibPromise;
+  }
+  function dataUrlBytes(du) {
+    const b = atob(du.split(',')[1]), u = new Uint8Array(b.length);
+    for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i);
+    return u;
+  }
+  function bytesDataUrl(u8, mime) {
+    let s = '';
+    for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000));
+    return 'data:' + mime + ';base64,' + btoa(s);
+  }
+  function fmtFecha(ms) {
+    const d = new Date(ms), z = n => String(n).padStart(2, '0');
+    return z(d.getDate()) + '/' + z(d.getMonth() + 1) + '/' + d.getFullYear() + ' ' + z(d.getHours()) + ':' + z(d.getMinutes());
+  }
+  async function stampPdfCopy(pdfDataUrl, f) {
+    const {PDFDocument, rgb, StandardFonts} = await loadPdfLib();
+    const doc = await PDFDocument.load(dataUrlBytes(pdfDataUrl));
+    const kw = doc.getKeywords() || '';
+    const m = /ET-SIG:(\{\S*\})/.exec(kw);
+    if (!m) return null;
+    const info = JSON.parse(m[1]);
+    const page = doc.getPage(info.page);
+    const H = page.getHeight();
+    const font = await doc.embedFont(StandardFonts.Helvetica);
+    async function fill(box, sig, at) {
+      const [x, y, w, h] = box.sig;
+      const img = await doc.embedPng(dataUrlBytes(sig));
+      const sc = Math.min((w - 12) / img.width, h / img.height);
+      page.drawImage(img, {x: x + 6, y: H - y - h + (h - img.height * sc) / 2, width: img.width * sc, height: img.height * sc});
+      const [fx, fy, fw, fh] = box.fecha;
+      page.drawRectangle({x: fx, y: H - fy - fh, width: fw, height: fh, color: rgb(1, 1, 1)});
+      page.drawText(fmtFecha(at), {x: fx + 2, y: H - fy - fh + 4, size: 9.6, font, color: rgb(0, 0, 0)});
+    }
+    await fill(info.rep, f.ownerSig, f.ownerAt);
+    await fill(info.cli, f.clientSig, f.clientAt);
+    doc.setKeywords([kw.replace(/ET-SIG:\{\S*\}/, '').trim(), 'ET-FIRMADO'].filter(Boolean));
+    doc.setModificationDate(new Date());
+    return bytesDataUrl(await doc.save(), 'application/pdf');
+  }
+  let stamping = false;
+  async function runStamping() {
+    if (stamping || !ready || !cloudReady || !window.firebase || !firebase.firestore) return;
+    stamping = true;
+    let total = 0;
+    try {
+      for (const p of data.projects || []) {
+        const ownerSig = safeSig(p.ownerSignature);
+        if (!ownerSig) continue;
+        const hayPdf = (p.avances || []).some(av => (av.attachments || []).some(a => a.type === 'pdf' && !/_firmado\.pdf$/i.test(a.name || '')));
+        if (!hayPdf) continue;
+        let acc = null;
+        try {
+          const mir = await firebase.firestore().collection('clientView').doc(p.id).get();
+          const mirror = mir.exists ? mir.data() : null;
+          if (!mirror || !mirror.clientUid || !mirror.clientApproved) continue;
+          const ad = await firebase.firestore().collection('clientAccounts').doc(mirror.clientUid).get();
+          acc = ad.exists ? ad.data() : null;
+        } catch (e) { continue; }
+        const approvals = (acc && acc.avanceApprovals) || {};
+        const before = clone(p);
+        let changedP = false;
+        for (const av of p.avances || []) {
+          const ap = approvals[av.id];
+          const clientSig = ap && ap.agreed ? safeSig(ap.signature) : '';
+          if (!clientSig) continue;
+          const names = new Set((av.attachments || []).map(x => x.name));
+          for (const a of (av.attachments || []).slice()) {
+            if (a.type !== 'pdf' || /_firmado\.pdf$/i.test(a.name || '')) continue;
+            const outName = String(a.name || 'documento.pdf').replace(/\.pdf$/i, '') + '_firmado.pdf';
+            if (names.has(outName)) continue;
+            if (!a.data) { try { a.data = await cloudDownloadFile(a.storagePath); } catch (e) { continue; } }
+            let out = null;
+            try { out = await stampPdfCopy(a.data, {ownerSig, clientSig, ownerAt: Date.now(), clientAt: ap.signedAt || Date.now()}); }
+            catch (e) { console.warn('No se pudo firmar', a.name, e); continue; }
+            if (!out) continue;
+            av.attachments.push({name: outName, type: 'pdf', data: out});
+            names.add(outName); changedP = true; total++;
+          }
+        }
+        if (changedP) {
+          p.updatedAt = Date.now();
+          if (data.draft && data.draft.id === p.id && sameProjectContent(before, data.draft)) data.draft = clone(p);
+        }
+      }
+      if (total) {
+        status('Generando copias firmadas…');
+        await cloudPushProjects();
+        await persist();
+        status('Copias firmadas generadas: ' + total + '.');
+        if (S.tab === 'proyectos') { try { rProyectos(); } catch (e) {} }
+      }
+    } catch (e) { console.warn('Copias firmadas:', e); }
+    finally { stamping = false; }
+  }
+  window.rnRunStamping = runStamping;
   function cloudInit() {
     if (!window.firebase || !firebase.firestore) return;
     cloudDoc = firebase.firestore().collection('sync').doc('proyectos');
@@ -309,7 +422,7 @@
       if (!user || cloudReady) return;
       cloudReady = true;
       cloudSubscribe(0);
-      whenFirstMerge(60000).then(() => setTimeout(runMigration, 1500));
+      whenFirstMerge(60000).then(() => { setTimeout(runMigration, 1500); setTimeout(runStamping, 8000); setInterval(runStamping, 300000); });
       /* Si la nube no responde en un tiempo razonable, se habilita igual el
          guardado (modo sin conexion) para no bloquear al dueño. */
       setTimeout(markFirstMerge, 25000);
@@ -483,7 +596,7 @@
         const clientSigHtml = acc && safeSig(acc.signature)
           ? `<p style="margin-top:10px;font-weight:700">Firma del cliente:</p><img src="${safeSig(acc.signature)}" alt="Firma del cliente" style="max-width:260px;border:1px solid var(--bd);border-radius:8px;background:#fff">`
           : `<p style="margin-top:10px;color:var(--mut)">El cliente aún no ha firmado.</p>`;
-        box.innerHTML = `<p>Cliente con acceso a este proyecto: <strong>${escape(email)}</strong></p>${clientSigHtml}<button class="btn br sm" data-action="revoke-client" style="margin-top:10px">Revocar acceso</button>`;
+        box.innerHTML = `<p>Cliente con acceso a este proyecto: <strong>${escape(email)}</strong></p>${clientSigHtml}${safeSig(acc && acc.signature) ? '<button class="btn bh sm" data-action="reset-client-sig" style="margin-top:10px;margin-right:8px">Permitir que el cliente firme de nuevo</button>' : ''}<button class="btn br sm" data-action="revoke-client" style="margin-top:10px">Revocar acceso</button>`;
         /* Se copia la firma del cliente al proyecto (aunque solo viva de
            verdad en su cuenta de Firestore) para que el generador de PDF,
            que no tiene acceso a la nube en ese momento, pueda incluirla. */
@@ -503,6 +616,7 @@
           changed();
           syncDraftToSavedProject();
         }
+        setTimeout(runStamping, 800);
         return;
       }
       const pending = await firebase.firestore().collection('clientAccounts').where('projectNumber', '==', projectNumber).where('status', '==', 'pending').get();
@@ -785,6 +899,12 @@
         const clientUid = button.dataset.uid;
         await firebase.firestore().collection('clientAccounts').doc(clientUid).update({status: 'approved', projectId: data.draft.id, approvedAt: Date.now()});
         await firebase.firestore().collection('clientView').doc(data.draft.id).set({clientUid: clientUid, clientApproved: true}, {merge: true});
+        renderClientAccess();
+      }
+      if (action === 'reset-client-sig' && confirm('El cliente podrá dibujar su firma de nuevo. Las aprobaciones de avances ya firmadas se mantienen. ¿Continuar?')) {
+        const mir = await firebase.firestore().collection('clientView').doc(data.draft.id).get();
+        const uid = mir.exists ? mir.data().clientUid : null;
+        if (uid) await firebase.firestore().collection('clientAccounts').doc(uid).update({signature: '', signedAt: 0});
         renderClientAccess();
       }
       if (action === 'reject-client') {
